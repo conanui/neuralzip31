@@ -788,64 +788,40 @@ Contoh:
       .padStart(2, '0')}.${secs.toString().padStart(2, '0')}`
   }
 
-  const GenerateFeedback = async () => {
-  if (feedbackGeneratedRef.current) return;
-  feedbackGeneratedRef.current = true;
+   const GenerateFeedback = async () => {
+    if (feedbackGeneratedRef.current) return
+    feedbackGeneratedRef.current = true
 
-  try {
-    // Validate required data
-    if (!conversation || !conversation.length) {
-      console.error('No conversation data available');
-      toast('No conversation data available', { type: 'error' });
-      throw new Error('No conversation data available');
+    try {
+      const result = await axios.post('/api/ai-feedback', {
+        conversation: conversation,
+      })
+
+      const Content = result.data.content
+      const FINAL_CONTENT = Content.replace('```json', '').replace('```', '')
+
+      const { data, error } = await supabase
+        .from('interview-feedback')
+        .insert([
+          {
+            userName: interviewInfo?.userName,
+            userEmail: interviewInfo?.userEmail,
+            interview_id: interview_id,
+            feedback: JSON.parse(FINAL_CONTENT),
+            recommended: false,
+          },
+        ])
+        .select()
+
+      console.log(data)
+      router.replace('/interview/' + interview_id + '/completed')
+    } catch (err) {
+      console.error('Feedback generation failed:', err)
+    } finally {
+      setLoading(false)
     }
-
-    if (!interviewInfo?.userName || !interviewInfo?.userEmail || !interview_id) {
-      console.error('Missing required fields');
-      toast('Missing required fields', { type: 'error' });
-      throw new Error('Missing required fields');
-    }
-
-    // Generate feedback
-    const result = await axios.post('/api/ai-feedback', {
-      conversation: conversation,
-    });
-
-    const Content = result.data.content;
-    const FINAL_CONTENT = Content.replace('```json', '').replace('```', '');
-
-    // Insert feedback and conversation data into Supabase
-    const { data, error } = await supabase
-      .from('interview-feedback')
-      .insert([
-        {
-          userName: interviewInfo?.userName,
-          userEmail: interviewInfo?.userEmail,
-          interview_id: interview_id,
-          feedback: JSON.parse(FINAL_CONTENT),
-          recommended: false,
-          conversation_interview: conversation, // Use conversation directly (jsonb)
-          // Use JSON.stringify(conversation) if conversation_interview is text
-        },
-      ])
-      .select();
-
-    if (error) {
-      console.error('Failed to save feedback and conversation:', error);
-      toast('Failed to save data', { type: 'error' });
-      throw new Error('Failed to save feedback and conversation: ' + error.message);
-    }
-
-    console.log('Feedback and conversation saved:', data);
-    toast('Feedback and conversation saved successfully', { duration: 2000 });
-    router.replace('/interview/' + interview_id + '/completed');
-  } catch (err) {
-    console.error('Operation failed:', err);
-    toast('Error: ' + err.message, { type: 'error' });
-  } finally {
-    setLoading(false);
   }
-};
+  
 
 
   return (
