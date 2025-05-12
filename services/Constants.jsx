@@ -201,7 +201,7 @@ Berdasarkan percakapan wawancara antara pewawancara dan kandidat di atas, berika
    - Pengalaman: Evaluasi relevansi dan kedalaman pengalaman kandidat terhadap posisi yang dilamar.
 
 2. KRITERIA PENILAIAN:
-   - 0: Tidak ada jawaban/respons yang relevan
+   - 0: Tidak ada jawaban sama sekali
    - 1-3: Di bawah ekspektasi, jawaban sangat lemah atau tidak memadai
    - 4-6: Memenuhi ekspektasi dasar, jawaban cukup tapi tidak menonjol
    - 7-8: Di atas ekspektasi, jawaban berkualitas tinggi
@@ -212,7 +212,13 @@ Berdasarkan percakapan wawancara antara pewawancara dan kandidat di atas, berika
    - Berikan rekomendasi "DIREKOMENDASIKAN" atau "TIDAK DIREKOMENDASIKAN" berdasarkan penilaian objektif.
    - Jelaskan alasan rekomendasi Anda dalam satu kalimat yang jelas dan padat.
 
-SANGAT PENTING: Jika kandidat tidak menjawab pertanyaan atau memberikan jawaban yang sangat minim/tidak relevan, beri nilai 0-2 untuk kategori tersebut. Kandidat harus mendapat nilai rendah jika tidak menunjukkan pemahaman atau kemampuan yang diharapkan.
+PENTING: 
+- Nilai kandidat secara ADIL berdasarkan kualitas jawaban mereka.
+- Jangan memberikan nilai rendah kecuali jawaban benar-benar tidak memadai atau tidak relevan.
+- Jika kandidat menjawab pertanyaan, meskipun jawabannya singkat tetapi relevan, berikan minimal nilai 4 untuk kategori tersebut.
+- Jika kandidat memberikan jawaban yang baik, berikan setidaknya nilai 7.
+- Anggap semua jawaban kandidat adalah upaya yang tulus untuk menjawab pertanyaan.
+- Nilai 0 hanya diberikan jika kandidat benar-benar tidak memberikan jawaban.
 
 Berikan jawaban dalam format JSON berikut:
 
