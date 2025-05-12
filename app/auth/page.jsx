@@ -52,7 +52,7 @@ function Login() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: 'http://localhost:3000/dashboard' // arahkan ke dashboard setelah login
+        redirectTo: 'https://neuralzip31.vercel.app/dashboard' // arahkan ke dashboard setelah login
       }
     })
 
