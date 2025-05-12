@@ -640,8 +640,7 @@ function StartInterview() {
   const [timer, setTimer] = useState(0)
   const [timerActive, setTimerActive] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
-  // Keep track of all messages in the conversation
-  const [allMessages, setAllMessages] = useState([])
+  const [conversation, setConversation] = useState()
   const { interview_id } = useParams()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -681,8 +680,6 @@ function StartInterview() {
       setIsCallActive(true)
       setTimerActive(true)
       setTimer(0)
-      // Reset messages when call starts
-      setAllMessages([])
     }
 
     const handleSpeechStart = () => {
@@ -704,56 +701,8 @@ function StartInterview() {
     }
 
     const handleMessage = (message) => {
-      console.log('Message received:', message)
-      
-      // Safety check for message format
-      if (!message) return
-      
-      try {
-        // Keep track of system prompt message
-        if (message.role === 'system') {
-          setAllMessages(prev => {
-            // Check if the system message is already in the array
-            const hasSystemMessage = prev.some(m => m.role === 'system')
-            if (!hasSystemMessage) {
-              return [...prev, message]
-            }
-            return prev
-          })
-        }
-        
-        // Handle conversation messages
-        if (message.conversation && Array.isArray(message.conversation.messages)) {
-          console.log(`Received ${message.conversation.messages.length} messages`)
-          
-          // Extract and store messages (avoiding duplicates)
-          const newMessages = [...message.conversation.messages]
-          
-          // Update the state with new messages (avoiding duplicates by checking message content)
-          setAllMessages(prev => {
-            // Create a new array including unique messages
-            const updatedMessages = [...prev]
-            
-            for (const newMsg of newMessages) {
-              // Skip empty or invalid messages
-              if (!newMsg || !newMsg.role || !newMsg.content) continue
-              
-              // Check if this message content already exists
-              const exists = updatedMessages.some(
-                m => m.role === newMsg.role && m.content === newMsg.content
-              )
-              
-              if (!exists) {
-                updatedMessages.push(newMsg)
-              }
-            }
-            
-            return updatedMessages
-          })
-        }
-      } catch (err) {
-        console.error('Error processing message:', err)
-      }
+      console.log(message?.conversation)
+      setConversation(message?.conversation)
     }
 
     vapi.on('call-start', handleCallStart)
@@ -842,69 +791,15 @@ Contoh:
   const GenerateFeedback = async () => {
     if (feedbackGeneratedRef.current) return
     feedbackGeneratedRef.current = true
-    
-    setLoading(true)
-    
+
     try {
-      // Check if we have conversation data
-      if (allMessages.length === 0) {
-        console.error('No conversation messages available')
-        toast.error('Tidak ada data percakapan untuk dianalisis')
-        setLoading(false)
-        return
-      }
-      
-      console.log(`Generating feedback from ${allMessages.length} messages`)
-      
-      // Create a dummy default feedback if API fails
-      const defaultFeedback = {
-        umpanBalik: {
-          penilaian: {
-            kemampuanTeknis: 5,
-            komunikasi: 5,
-            pemecahanMasalah: 5,
-            pengalaman: 5,
-            keseluruhan: 5
-          },
-          ringkasan: "Wawancara berlangsung dengan baik. Kandidat menunjukkan pemahaman dasar terhadap posisi yang dilamar. Beberapa jawaban perlu pengembangan lebih lanjut.",
-          rekomendasi: "DIREKOMENDASIKAN",
-          pesanRekomendasi: "Kandidat memiliki potensi untuk berkembang dalam posisi ini."
-        }
-      };
-
-      // Send the conversation to the API for feedback
       const result = await axios.post('/api/ai-feedback', {
-        conversation: { messages: allMessages }
-      }).catch(err => {
-        console.error('API call failed:', err)
-        toast.error('Gagal mendapatkan feedback: ' + (err.message || 'Error tidak diketahui'))
-        // Return default feedback if API fails
-        return { data: { content: JSON.stringify(defaultFeedback) } }
-      });
-      
-      if (!result || !result.data) {
-        throw new Error('Invalid response from feedback API')
-      }
+        conversation: conversation,
+      })
 
-      // Parse the feedback content
-      const Content = result.data.content || ''
-      let parsedContent
-      
-      try {
-        // Try to clean and parse the JSON content
-        const FINAL_CONTENT = Content
-          .replace(/```json/g, '')
-          .replace(/```/g, '')
-          .trim()
-        
-        parsedContent = JSON.parse(FINAL_CONTENT)
-      } catch (parseError) {
-        console.error('Failed to parse feedback JSON:', parseError)
-        // Use default feedback if parsing fails
-        parsedContent = defaultFeedback
-      }
+      const Content = result.data.content
+      const FINAL_CONTENT = Content.replace('```json', '').replace('```', '')
 
-      // Save the feedback to Supabase
       const { data, error } = await supabase
         .from('interview-feedback')
         .insert([
@@ -912,27 +807,26 @@ Contoh:
             userName: interviewInfo?.userName,
             userEmail: interviewInfo?.userEmail,
             interview_id: interview_id,
-            feedback: parsedContent,
-            recommended: parsedContent?.umpanBalik?.rekomendasi === 'DIREKOMENDASIKAN',
+            feedback: JSON.parse(FINAL_CONTENT),
+            recommended: false,
           },
         ])
         .select()
 
-      if (error) {
-        console.error('Supabase error:', error)
-        toast.error('Gagal menyimpan feedback ke database')
-      } else {
-        console.log('Feedback saved:', data)
-        router.replace('/interview/' + interview_id + '/completed')
-      }
+      console.log(data)
+      router.replace('/interview/' + interview_id + '/completed')
     } catch (err) {
       console.error('Feedback generation failed:', err)
-      toast.error('Gagal menghasilkan feedback: ' + (err.message || 'Unknown error'))
     } finally {
       setLoading(false)
     }
   }
   
+
+ 
+  
+
+
   return (
     <div className="p-20 lg:px-48 xl:px-56">
       <h2 className="font-bold text-xl flex justify-between">
@@ -984,16 +878,7 @@ Contoh:
         </AlertConfirmation>
       </div>
 
-      <h2 className="text-sm text-gray-400 text-center mt-5">
-        {isCallActive ? 'Interview in progress...' : 'Ready to start interview'}
-      </h2>
-      
-      {/* Debug info - remove in production */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-5 text-xs text-gray-400">
-          Messages captured: {allMessages.length}
-        </div>
-      )}
+      <h2 className="text-sm text-gray-400 text-center mt-5">Interview in progress...</h2>
     </div>
   )
 }
