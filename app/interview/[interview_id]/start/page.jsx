@@ -621,7 +621,13 @@ export default StartInterview
 */
 
 
-'use client'
+antml<invoke name="artifacts">
+<parameter name="command">create</parameter>
+<parameter name="id">fixed-start-interview</parameter>
+<parameter name="type">application/vnd.ant.code</parameter>
+<parameter name="language">javascript</parameter>
+<parameter name="title">Fixed StartInterview.js</parameter>
+<parameter name="content">'use client'
 import React, { useEffect, useState, useContext, useRef } from 'react'
 import { InterviewDataContext } from '@/context/InterviewDataContext'
 import { Phone, Timer, Mic } from 'lucide-react'
@@ -640,7 +646,7 @@ function StartInterview() {
   const [timer, setTimer] = useState(0)
   const [timerActive, setTimerActive] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
-  const [conversation, setConversation] = useState()
+  const [conversation, setConversation] = useState({ messages: [] }) // FIXED: Initialize with empty messages array
   const { interview_id } = useParams()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -701,8 +707,11 @@ function StartInterview() {
     }
 
     const handleMessage = (message) => {
-      console.log(message?.conversation)
-      setConversation(message?.conversation)
+      console.log('New message received:', message?.conversation?.messages?.length || 0, 'messages')
+      if (message?.conversation) {
+        // FIXED: Ensure we store the complete conversation
+        setConversation(message.conversation)
+      }
     }
 
     vapi.on('call-start', handleCallStart)
@@ -791,14 +800,43 @@ Contoh:
   const GenerateFeedback = async () => {
     if (feedbackGeneratedRef.current) return
     feedbackGeneratedRef.current = true
-
+    
+    setLoading(true)
+    
     try {
+      // FIXED: Log the conversation data to help with debugging
+      console.log('Generating feedback with conversation data:', 
+        conversation?.messages?.length || 0, 'messages')
+        
+      // FIXED: Ensure we're sending proper data to the API
+      if (!conversation || !conversation.messages || conversation.messages.length === 0) {
+        console.error('No conversation data available')
+        toast.error('Gagal menghasilkan feedback: Tidak ada data percakapan')
+        return
+      }
+
       const result = await axios.post('/api/ai-feedback', {
         conversation: conversation,
       })
 
+      console.log('Feedback API response:', result.data)
+      
       const Content = result.data.content
-      const FINAL_CONTENT = Content.replace('```json', '').replace('```', '')
+      // FIXED: More robust JSON parsing
+      let parsedContent
+      try {
+        // Try to clean and parse the JSON content
+        const FINAL_CONTENT = Content
+          .replace(/```json/g, '')
+          .replace(/```/g, '')
+          .trim()
+        
+        parsedContent = JSON.parse(FINAL_CONTENT)
+      } catch (parseError) {
+        console.error('Failed to parse feedback JSON:', parseError)
+        toast.error('Format feedback tidak valid')
+        return
+      }
 
       const { data, error } = await supabase
         .from('interview-feedback')
@@ -807,26 +845,28 @@ Contoh:
             userName: interviewInfo?.userName,
             userEmail: interviewInfo?.userEmail,
             interview_id: interview_id,
-            feedback: JSON.parse(FINAL_CONTENT),
+            feedback: parsedContent,
             recommended: false,
           },
         ])
         .select()
 
-      console.log(data)
+      if (error) {
+        console.error('Supabase error:', error)
+        toast.error('Gagal menyimpan feedback')
+        return
+      }
+
+      console.log('Feedback saved:', data)
       router.replace('/interview/' + interview_id + '/completed')
     } catch (err) {
       console.error('Feedback generation failed:', err)
+      toast.error('Gagal menghasilkan feedback: ' + (err.message || 'Unknown error'))
     } finally {
       setLoading(false)
     }
   }
   
-
- 
-  
-
-
   return (
     <div className="p-20 lg:px-48 xl:px-56">
       <h2 className="font-bold text-xl flex justify-between">
@@ -882,5 +922,6 @@ Contoh:
     </div>
   )
 }
+
 
 export default StartInterview
