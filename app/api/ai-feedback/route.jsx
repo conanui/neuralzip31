@@ -40,40 +40,15 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
 export async function POST(req) {
+  const { conversation } = await req.json();
+  
+  // Process conversation to extract actual Q&A pairs
+  const processedConversation = processConversation(conversation);
+  
+  // Create an enhanced prompt with the processed conversation
+  const FINAL_PROMPT = createEnhancedPrompt(processedConversation);
+
   try {
-    // Parse the request body, handle potential errors
-    const body = await req.json().catch(e => {
-      console.error("Failed to parse request JSON:", e);
-      return {};
-    });
-    
-    const { conversation } = body;
-    
-    // Validate conversation data
-    if (!conversation) {
-      console.error("No conversation data received");
-      return NextResponse.json(
-        { error: "No conversation data provided" },
-        { status: 400 }
-      );
-    }
-    
-    // Log raw conversation data for debugging
-    console.log("Raw conversation received:", 
-      Array.isArray(conversation.messages) 
-        ? `${conversation.messages.length} messages` 
-        : "No messages array");
-    
-    // Process conversation to extract actual Q&A pairs
-    const processedConversation = processConversation(conversation);
-    
-    // Create an enhanced prompt with the processed conversation
-    const FINAL_PROMPT = createEnhancedPrompt(processedConversation);
-    
-    // Log the processed conversation and prompt for debugging
-    console.log("Processed conversation:", processedConversation);
-    
-    // Call OpenRouter API
     const openai = new OpenAI({
       baseURL: "https://openrouter.ai/api/v1",
       apiKey: process.env.OPENROUTER_API_KEY_HU,
@@ -88,11 +63,8 @@ export async function POST(req) {
     
     return NextResponse.json(completion.choices[0].message);
   } catch(e) {
-    console.error("Error in ai-feedback API route:", e);
-    return NextResponse.json(
-      { error: e.message || "An error occurred" },
-      { status: 500 }
-    );
+    console.log(e);
+    return NextResponse.json(e);
   }
 }
 
@@ -100,58 +72,33 @@ export async function POST(req) {
  * Process the raw conversation data to extract meaningful Q&A pairs
  */
 function processConversation(conversation) {
-  // If conversation data is not in expected format, handle gracefully
-  let messages = [];
-  
-  // Handle different possible conversation formats
-  if (Array.isArray(conversation)) {
-    // If conversation is directly an array
-    messages = conversation;
-  } else if (conversation && Array.isArray(conversation.messages)) {
-    // If conversation has a messages array property
-    messages = conversation.messages;
-  } else if (conversation && typeof conversation === 'object') {
-    // Try to find any array in the conversation object
-    for (const key in conversation) {
-      if (Array.isArray(conversation[key])) {
-        messages = conversation[key];
-        break;
-      }
-    }
-  }
-  
-  // If we still couldn't find messages, return empty result
-  if (messages.length === 0) {
+  // If conversation is empty or undefined
+  if (!conversation || !conversation.messages || conversation.messages.length === 0) {
     return {
       questions: 0,
       answers: 0,
       hasResponses: false,
-      pairs: [],
-      error: "No valid messages found in conversation data"
+      pairs: []
     };
   }
 
+  const messages = conversation.messages;
   const pairs = [];
+  let currentQuestion = null;
   let assistantMessages = 0;
   let userMessages = 0;
-  let currentQuestion = null;
   
-  // Process each message to create Q&A pairs
-  for (let i = 0; i < messages.length; i++) {
-    const message = messages[i];
-    
-    // Skip invalid messages
-    if (!message || typeof message !== 'object') continue;
-    
+  // Iterate through messages to pair questions with answers
+  for (const message of messages) {
     // Skip system messages
     if (message.role === 'system') continue;
     
-    // Handle assistant messages as questions
+    // Track assistant messages (questions)
     if (message.role === 'assistant') {
       assistantMessages++;
-      currentQuestion = message.content || "";
+      currentQuestion = message.content;
       
-      // Start a new pair if we have a question
+      // Start a new pair
       if (currentQuestion) {
         pairs.push({
           question: currentQuestion,
@@ -160,32 +107,31 @@ function processConversation(conversation) {
       }
     }
     
-    // Handle user messages as answers
+    // Track user messages (answers)
     if (message.role === 'user') {
       userMessages++;
       
       // If we have a current pair without an answer, add this as the answer
-      if (pairs.length > 0) {
-        const lastPair = pairs[pairs.length - 1];
-        if (lastPair && lastPair.answer === null) {
-          lastPair.answer = message.content || "";
-        }
+      const lastPair = pairs[pairs.length - 1];
+      if (lastPair && lastPair.answer === null) {
+        lastPair.answer = message.content;
       }
     }
   }
   
-  // Count valid pairs (both question and answer present)
-  const validPairs = pairs.filter(pair => 
-    pair.question && pair.answer && 
-    pair.question.trim() !== "" && 
-    pair.answer.trim() !== "");
+  // Count substantive answers (non-empty, more than just greetings)
+  const substantiveAnswers = pairs.filter(pair => {
+    const answer = pair.answer?.toLowerCase() || '';
+    // Skip empty answers or very short responses like "hello", "ok", etc.
+    return answer.length > 10 && 
+           !['hello', 'hi', 'hey', 'ok', 'yes', 'no'].includes(answer.trim());
+  }).length;
   
   return {
-    questions: Math.max(0, assistantMessages - 1), // Subtract 1 for intro message
-    answers: userMessages,
-    hasResponses: userMessages > 0,
-    pairs: pairs,
-    validPairs: validPairs.length
+    questions: assistantMessages - 1, // Subtract 1 for intro message
+    answers: substantiveAnswers,
+    hasResponses: substantiveAnswers > 0,
+    pairs: pairs
   };
 }
 
@@ -193,39 +139,29 @@ function processConversation(conversation) {
  * Create an enhanced prompt with specific instructions based on conversation analysis
  */
 function createEnhancedPrompt(processedConversation) {
-  // Get conversation data
+  // Basic validation - check if user actually participated meaningfully
   const { questions, answers, hasResponses, pairs } = processedConversation;
   
-  // Create a clean, formatted conversation for the LLM
-  const formattedConversation = pairs
-    .filter(pair => pair.question) // Ensure question exists
-    .map((pair, index) => {
-      const cleanQuestion = (pair.question || "").trim();
-      const cleanAnswer = (pair.answer || "No response").trim();
-      
-      return `Q${index + 1}: ${cleanQuestion}\nA${index + 1}: ${cleanAnswer}\n`;
-    })
-    .join('\n');
+  // Convert pairs to readable format for the LLM
+  const formattedConversation = pairs.map((pair, index) => {
+    return `Q${index + 1}: ${pair.question || 'N/A'}\nA${index + 1}: ${pair.answer || 'No response'}\n`;
+  }).join('\n');
   
-  // Create any special instructions based on conversation analysis
+  // Create a special instruction if user didn't answer questions
   let specialInstruction = '';
-  
-  // Only add negative instruction if truly no responses
-  if (pairs.length === 0 || !hasResponses) {
+  if (!hasResponses) {
     specialInstruction = `
-PENTING: Tidak ada percakapan wawancara yang cukup untuk dievaluasi.
+PENTING: Kandidat tidak memberikan jawaban substantif untuk pertanyaan-pertanyaan dalam wawancara ini. 
 Berikan nilai 0 untuk semua kategori dan buat rekomendasi negatif yang jelas.
 `;
-  } else {
-    // Add positive instruction to be fair in evaluation
+  } else if (answers < questions * 0.5) {
     specialInstruction = `
-PENTING: Evaluasi kandidat secara ADIL berdasarkan jawaban yang diberikan.
-Jangan memberikan nilai rendah tanpa alasan yang jelas.
-Anggap semua jawaban kandidat sebagai upaya tulus untuk menjawab pertanyaan.
+PENTING: Kandidat hanya menjawab ${answers} dari ${questions} pertanyaan secara substantif.
+Berikan penilaian yang sangat rendah dan pertimbangkan untuk tidak merekomendasikan kandidat ini.
 `;
   }
   
-  // Create the final prompt
+  // Create enhanced prompt
   const enhancedPrompt = `
 ${FEEDBACK_PROMPT.replace('{{conversation}}', formattedConversation)}
 
@@ -233,14 +169,12 @@ ${specialInstruction}
 
 Ikhtisar Wawancara:
 - Total Pertanyaan: ${questions}
-- Total Jawaban: ${answers}
-- Tingkat Partisipasi: ${questions > 0 ? `${Math.round((answers/questions) * 100)}%` : '0%'}
+- Jawaban Substantif: ${answers}
+- Tingkat Partisipasi: ${hasResponses ? `${Math.round((answers/questions) * 100)}%` : '0%'}
 
-PETUNJUK TAMBAHAN:
-- Jika kandidat telah menjawab pertanyaan dengan baik, berikan nilai minimal 7.
-- Jawaban yang cukup namun sederhana patut mendapat nilai minimal 5.
-- Nilai 0-3 hanya diberikan jika jawaban sangat tidak relevan atau sangat minimal.
+Berikan penilaian yang objektif berdasarkan kualitas jawaban. Jika kandidat tidak menjawab pertanyaan atau memberikan jawaban yang sangat minim, berikan nilai 0-3. Jika jawaban cukup tetapi tidak menonjol, berikan nilai 4-6. Hanya berikan nilai 7-10 untuk jawaban yang benar-benar berkualitas tinggi.
 `;
 
   return enhancedPrompt;
 }
+
