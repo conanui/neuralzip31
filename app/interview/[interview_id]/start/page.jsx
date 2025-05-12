@@ -808,6 +808,7 @@ Contoh:
             userEmail: interviewInfo?.userEmail,
             interview_id: interview_id,
             feedback: JSON.parse(FINAL_CONTENT),
+            conversation_interview: conversation,
             recommended: false,
           },
         ])
