@@ -150,12 +150,17 @@ function createEnhancedPrompt(processedConversation) {
   // Create a special instruction if user didn't answer questions
   let specialInstruction = '';
     
-     if (!hasResponses || answers === 0) {
+      if (!hasResponses) {
     specialInstruction = `
-PENTING: Kandidat tidak memberikan jawaban untuk pertanyaan-pertanyaan dalam wawancara ini.
+PENTING: Kandidat tidak memberikan jawaban substantif untuk pertanyaan-pertanyaan dalam wawancara ini. 
 Berikan nilai 0 untuk semua kategori dan buat rekomendasi negatif yang jelas.
 `;
-  } 
+  } else if (answers===0) {
+    specialInstruction = `
+PENTING: Kandidat hanya menjawab ${answers} dari ${questions} pertanyaan secara substantif.
+Berikan penilaian yang sangat rendah dan pertimbangkan untuk tidak merekomendasikan kandidat ini.
+`;
+  }
 
     
   // Create enhanced prompt
