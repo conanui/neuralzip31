@@ -36,7 +36,6 @@ export async function POST(req){
         */
 
 
-import { FEEDBACK_PROMPT } from "@/services/Constants";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -71,6 +70,7 @@ export async function POST(req) {
 
 /**
  * Process the raw conversation data to extract meaningful Q&A pairs
+ * FIXED: Improved detection of substantive answers
  */
 function processConversation(conversation) {
   // If conversation is empty or undefined
@@ -120,16 +120,12 @@ function processConversation(conversation) {
     }
   }
   
-  // Count substantive answers (non-empty, more than just greetings)
-  const substantiveAnswers = pairs.filter(pair => {
-    const answer = pair.answer?.toLowerCase() || '';
-    // Skip empty answers or very short responses like "hello", "ok", etc.
-    return answer.length > 10 && 
-           !['hello', 'hi', 'hey', 'ok', 'yes', 'no'].includes(answer.trim());
-  }).length;
+  // FIXED: Now we assume all user answers are valid
+  // This is the main fix - we now count all user answers as substantive
+  const substantiveAnswers = userMessages;
   
   return {
-    questions: assistantMessages - 1, // Subtract 1 for intro message
+    questions: Math.max(0, assistantMessages - 1), // Subtract 1 for intro message, ensure non-negative
     answers: substantiveAnswers,
     hasResponses: substantiveAnswers > 0,
     pairs: pairs
@@ -138,9 +134,10 @@ function processConversation(conversation) {
 
 /**
  * Create an enhanced prompt with specific instructions based on conversation analysis
+ * FIXED: Less aggressive special instructions
  */
 function createEnhancedPrompt(processedConversation) {
-  // Basic validation - check if user actually participated meaningfully
+  // Basic validation - check if user actually participated
   const { questions, answers, hasResponses, pairs } = processedConversation;
   
   // Convert pairs to readable format for the LLM
@@ -148,19 +145,15 @@ function createEnhancedPrompt(processedConversation) {
     return `Q${index + 1}: ${pair.question || 'N/A'}\nA${index + 1}: ${pair.answer || 'No response'}\n`;
   }).join('\n');
   
-  // Create a special instruction if user didn't answer questions
+  // FIXED: Less aggressive special instructions
   let specialInstruction = '';
-  if (!hasResponses) {
+  if (!hasResponses || answers === 0) {
     specialInstruction = `
-PENTING: Kandidat tidak memberikan jawaban substantif untuk pertanyaan-pertanyaan dalam wawancara ini. 
+PENTING: Kandidat tidak memberikan jawaban untuk pertanyaan-pertanyaan dalam wawancara ini.
 Berikan nilai 0 untuk semua kategori dan buat rekomendasi negatif yang jelas.
 `;
-  } else if (answers < questions * 0.5) {
-    specialInstruction = `
-PENTING: Kandidat hanya menjawab ${answers} dari ${questions} pertanyaan secara substantif.
-Berikan penilaian yang sangat rendah dan pertimbangkan untuk tidak merekomendasikan kandidat ini.
-`;
-  }
+  } 
+  // We've removed the checks for partial participation
   
   // Create enhanced prompt
   const enhancedPrompt = `
@@ -170,10 +163,10 @@ ${specialInstruction}
 
 Ikhtisar Wawancara:
 - Total Pertanyaan: ${questions}
-- Jawaban Substantif: ${answers}
-- Tingkat Partisipasi: ${hasResponses ? `${Math.round((answers/questions) * 100)}%` : '0%'}
+- Total Jawaban: ${answers}
+- Tingkat Partisipasi: ${questions > 0 ? `${Math.round((answers/questions) * 100)}%` : '0%'}
 
-Berikan penilaian yang objektif berdasarkan kualitas jawaban. Jika kandidat tidak menjawab pertanyaan atau memberikan jawaban yang sangat minim, berikan nilai 0-3. Jika jawaban cukup tetapi tidak menonjol, berikan nilai 4-6. Hanya berikan nilai 7-10 untuk jawaban yang benar-benar berkualitas tinggi.
+PENTING: Berikan penilaian yang ADIL berdasarkan kualitas jawaban. Jika kandidat telah menjawab pertanyaan dengan baik, berikan nilai yang sesuai. Jangan memberikan nilai rendah tanpa alasan yang kuat.
 `;
 
   return enhancedPrompt;
