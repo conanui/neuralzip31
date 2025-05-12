@@ -149,30 +149,29 @@ function createEnhancedPrompt(processedConversation) {
   
   // Create a special instruction if user didn't answer questions
   let specialInstruction = '';
-  if (!hasResponses) {
+    
+     if (!hasResponses || answers === 0) {
     specialInstruction = `
-PENTING: Kandidat tidak memberikan jawaban substantif untuk pertanyaan-pertanyaan dalam wawancara ini. 
+PENTING: Kandidat tidak memberikan jawaban untuk pertanyaan-pertanyaan dalam wawancara ini.
 Berikan nilai 0 untuk semua kategori dan buat rekomendasi negatif yang jelas.
 `;
-  } else if (answers < questions * 0.5) {
-    specialInstruction = `
-PENTING: Kandidat hanya menjawab ${answers} dari ${questions} pertanyaan secara substantif.
-Berikan penilaian yang sangat rendah dan pertimbangkan untuk tidak merekomendasikan kandidat ini.
-`;
-  }
-  
+  } 
+
+    
   // Create enhanced prompt
   const enhancedPrompt = `
 ${FEEDBACK_PROMPT.replace('{{conversation}}', formattedConversation)}
+
+
 
 ${specialInstruction}
 
 Ikhtisar Wawancara:
 - Total Pertanyaan: ${questions}
-- Jawaban Substantif: ${answers}
-- Tingkat Partisipasi: ${hasResponses ? `${Math.round((answers/questions) * 100)}%` : '0%'}
+- Total Jawaban: ${answers}
+- Tingkat Partisipasi: ${questions > 0 ? `${Math.round((answers/questions) * 100)}%` : '0%'}
 
-Berikan penilaian yang objektif berdasarkan kualitas jawaban. Jika kandidat tidak menjawab pertanyaan atau memberikan jawaban yang sangat minim, berikan nilai 0-3. Jika jawaban cukup tetapi tidak menonjol, berikan nilai 4-6. Hanya berikan nilai 7-10 untuk jawaban yang benar-benar berkualitas tinggi.
+PENTING: Berikan penilaian yang ADIL berdasarkan kualitas jawaban. Jika kandidat telah menjawab pertanyaan dengan baik, berikan nilai yang sesuai. Jangan memberikan nilai rendah tanpa alasan yang kuat.
 `;
 
   return enhancedPrompt;
