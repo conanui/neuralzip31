@@ -812,7 +812,8 @@ Contoh:
             recommended: false,
           },
         ])
-        .select()
+        .select('userName, userEmail, interview_id, feedback, conversation_interview, recommended')
+
 
       console.log(data)
       router.replace('/interview/' + interview_id + '/completed')
