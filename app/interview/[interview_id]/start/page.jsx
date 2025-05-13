@@ -620,6 +620,7 @@ Contoh:
 export default StartInterview
 */
 
+
 'use client'
 import React, { useEffect, useState, useContext, useRef } from 'react'
 import { InterviewDataContext } from '@/context/InterviewDataContext'
@@ -644,14 +645,14 @@ function StartInterview() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
-  // Stabilkan Vapi instance
+  // Stabilize Vapi instance
   const vapiRef = useRef(null)
   if (!vapiRef.current) {
     vapiRef.current = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY)
   }
   const vapi = vapiRef.current
 
-  // Cegah multiple feedback
+  // Prevent multiple feedback generation
   const feedbackGeneratedRef = useRef(false)
 
   useEffect(() => {
@@ -696,12 +697,22 @@ function StartInterview() {
       toast('Interview Ended', { id: 'call-end', duration: 2000 })
       setIsCallActive(false)
       setTimerActive(false)
-      GenerateFeedback()
+      
+      // Check if we have captured conversation data
+      if (conversation) {
+        generateFeedback()
+      } else {
+        console.error('No conversation data available for feedback generation')
+        toast.error('Failed to generate feedback: No conversation data', { duration: 3000 })
+      }
     }
 
     const handleMessage = (message) => {
-      console.log(message?.conversation)
-      setConversation(message?.conversation)
+      console.log('Conversation update received:', message)
+      if (message?.conversation) {
+        console.log('Setting conversation data')
+        setConversation(message.conversation)
+      }
     }
 
     vapi.on('call-start', handleCallStart)
@@ -717,7 +728,7 @@ function StartInterview() {
       vapi.off('call-end', handleCallEnd)
       vapi.off('message', handleMessage)
     }
-  }, [])
+  }, [conversation])
 
   const startCall = () => {
     const questions = interviewInfo?.interviewData?.questionList
@@ -774,7 +785,14 @@ Contoh:
       vapi.stop()
       setIsCallActive(false)
       setTimerActive(false)
-      GenerateFeedback()
+      
+      // Only generate feedback if we have conversation data
+      if (conversation) {
+        generateFeedback()
+      } else {
+        console.error('No conversation data available for feedback generation')
+        toast.error('Failed to generate feedback: No conversation data', { duration: 3000 })
+      }
     }
   }
 
@@ -787,17 +805,65 @@ Contoh:
       .padStart(2, '0')}.${secs.toString().padStart(2, '0')}`
   }
 
-  const GenerateFeedback = async () => {
-    if (feedbackGeneratedRef.current) return
+  const generateFeedback = async () => {
+    // Prevent duplicate feedback generation
+    if (feedbackGeneratedRef.current) {
+      console.log('Feedback already being generated, skipping duplicate request')
+      return
+    }
+    
     feedbackGeneratedRef.current = true
-
+    setLoading(true)
+    
     try {
+      console.log('Generating feedback for conversation:', conversation)
+      
+      // Show toast to indicate feedback generation has started
+      toast.loading('Generating interview feedback...', { id: 'feedback-gen', duration: 10000 })
+      
       const result = await axios.post('/api/ai-feedback', {
         conversation: conversation,
       })
 
+      console.log('Feedback API response:', result.data)
+      toast.success('Feedback generated successfully', { id: 'feedback-gen' })
+
       const Content = result.data.content
-      const FINAL_CONTENT = Content.replace('```json', '').replace('```', '')
+      // More robust JSON parsing
+      let parsedContent = null
+      try {
+        // Try direct parsing first
+        parsedContent = JSON.parse(Content)
+      } catch (e) {
+        console.log('Direct parsing failed, trying to extract JSON from response', e)
+        // If that fails, try to extract JSON from markdown code blocks
+        const jsonMatch = Content.match(/```json([\s\S]*?)```/) || Content.match(/```([\s\S]*?)```/)
+        if (jsonMatch && jsonMatch[1]) {
+          try {
+            parsedContent = JSON.parse(jsonMatch[1].trim())
+          } catch (e2) {
+            console.error('Failed to parse JSON from markdown block', e2)
+          }
+        }
+        
+        // If still failed, try to find JSON-like structure anywhere in the text
+        if (!parsedContent) {
+          const jsonObjectMatch = Content.match(/{[\s\S]*}/);
+          if (jsonObjectMatch) {
+            try {
+              parsedContent = JSON.parse(jsonObjectMatch[0])
+            } catch (e3) {
+              console.error('Failed to parse JSON from text', e3)
+            }
+          }
+        }
+      }
+      
+      if (!parsedContent) {
+        throw new Error('Failed to parse feedback content as JSON')
+      }
+
+      console.log('Parsed feedback content:', parsedContent)
 
       const { data, error } = await supabase
         .from('interview-feedback')
@@ -806,25 +872,28 @@ Contoh:
             userName: interviewInfo?.userName,
             userEmail: interviewInfo?.userEmail,
             interview_id: interview_id,
-            feedback: JSON.parse(FINAL_CONTENT),
-            recommended: false,
+            feedback: parsedContent,
+            recommended: parsedContent?.umpanBalik?.rekomendasi === 'DIREKOMENDASIKAN',
           },
         ])
         .select()
 
-      console.log(data)
+      if (error) {
+        throw new Error(`Supabase error: ${error.message}`)
+      }
+      
+      console.log('Feedback saved to database:', data)
       router.replace('/interview/' + interview_id + '/completed')
     } catch (err) {
       console.error('Feedback generation failed:', err)
+      toast.error(`Failed to generate feedback: ${err.message}`, { id: 'feedback-gen', duration: 5000 })
+      
+      // Reset the flag to allow retrying
+      feedbackGeneratedRef.current = false
     } finally {
       setLoading(false)
     }
   }
-  
-
- 
-  
-
 
   return (
     <div className="p-20 lg:px-48 xl:px-56">
@@ -877,7 +946,13 @@ Contoh:
         </AlertConfirmation>
       </div>
 
-      <h2 className="text-sm text-gray-400 text-center mt-5">Interview in progress...</h2>
+      <h2 className="text-sm text-gray-400 text-center mt-5">
+        {isCallActive 
+          ? 'Interview in progress...' 
+          : loading 
+            ? 'Generating feedback...' 
+            : 'Click the phone icon to start the interview'}
+      </h2>
     </div>
   )
 }
