@@ -1031,23 +1031,20 @@ function StartInterview() {
   const [timer, setTimer] = useState(0)
   const [timerActive, setTimerActive] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
-  const [conversation, setConversation] = useState(null)
-  const [transcript, setTranscript] = useState([])
+  const [conversation, setConversation] = useState()
   const { interview_id } = useParams()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
-  // Stabilize Vapi instance
+  // Stabilkan Vapi instance
   const vapiRef = useRef(null)
   if (!vapiRef.current) {
     vapiRef.current = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY)
   }
   const vapi = vapiRef.current
 
-  // Prevent multiple feedback generation
+  // Cegah multiple feedback
   const feedbackGeneratedRef = useRef(false)
-  // Keep track of transcript messages
-  const transcriptRef = useRef([])
 
   useEffect(() => {
     if (interviewInfo && !hasStarted) {
@@ -1074,9 +1071,6 @@ function StartInterview() {
       setIsCallActive(true)
       setTimerActive(true)
       setTimer(0)
-      // Reset transcript at the start of the call
-      transcriptRef.current = []
-      setTranscript([])
     }
 
     const handleSpeechStart = () => {
@@ -1094,68 +1088,12 @@ function StartInterview() {
       toast('Interview Ended', { id: 'call-end', duration: 2000 })
       setIsCallActive(false)
       setTimerActive(false)
-      
-      // If we don't have a conversation but have transcript, construct one
-      if (((!conversation || !conversation.messages) && transcriptRef.current.length > 0)) {
-        console.log('Building conversation from transcript...')
-        const constructedConversation = {
-          messages: transcriptRef.current.map(t => ({
-            role: t.role,
-            content: t.content
-          }))
-        }
-        setConversation(constructedConversation)
-        
-        // Use a timeout to ensure state is updated before generating feedback
-        setTimeout(() => {
-          generateFeedback(constructedConversation)
-        }, 500)
-      } else if (conversation && conversation.messages) {
-        // Small delay to ensure all state updates are processed
-        setTimeout(() => generateFeedback(), 500)
-      } else {
-        console.warn('No conversation data available - creating mock data')
-        const mockConversation = {
-          messages: [
-            { role: 'assistant', content: 'Selamat datang di wawancara. Bisakah Anda jelaskan pengalaman Anda?' },
-            { role: 'user', content: 'Saya memiliki pengalaman 3 tahun sebagai developer.' },
-            { role: 'assistant', content: 'Bagaimana pendekatan Anda terhadap masalah teknis?' },
-            { role: 'user', content: 'Saya menggunakan pendekatan sistematis untuk debugging dan pemecahan masalah.' }
-          ]
-        }
-        setConversation(mockConversation)
-        setTimeout(() => generateFeedback(mockConversation), 800)
-      }
+      GenerateFeedback()
     }
 
     const handleMessage = (message) => {
-      console.log('Conversation update received:', message)
-      
-      // Handle transcript updates
-      if (message?.data?.transcript) {
-        const newTranscript = message.data.transcript
-        console.log('Transcript update received:', newTranscript)
-        
-        // Update our local transcript ref
-        if (Array.isArray(newTranscript)) {
-          const formattedTranscript = newTranscript.map(t => ({
-            role: t.speaker === 'assistant' ? 'assistant' : 'user',
-            content: t.text
-          }))
-          
-          transcriptRef.current = formattedTranscript
-          setTranscript(formattedTranscript)
-        }
-      }
-      
-      // Handle direct conversation updates
-      if (message?.data?.conversation) {
-        console.log('Found conversation in message.data.conversation')
-        setConversation(message.data.conversation)
-      } else if (message?.conversation) {
-        console.log('Found conversation directly in message.conversation')
-        setConversation(message.conversation)
-      }
+      console.log(message?.conversation)
+      setConversation(message?.conversation)
     }
 
     vapi.on('call-start', handleCallStart)
@@ -1164,31 +1102,12 @@ function StartInterview() {
     vapi.on('call-end', handleCallEnd)
     vapi.on('message', handleMessage)
 
-    // Get the current state of conversation when the call ends
-    vapi.on('status-update', (update) => {
-      console.log('Status update received:', update)
-      if (update.status === 'ended') {
-        // Try to get latest conversation/transcript state
-        console.log('Call ended via status update')
-        
-        // If needed we could make an API call to Vapi to get the conversation
-        // But for now we'll rely on our accumulated transcript
-        if (transcriptRef.current.length > 0) {
-          const constructedConversation = {
-            messages: transcriptRef.current
-          }
-          setConversation(constructedConversation)
-        }
-      }
-    })
-
     return () => {
       vapi.off('call-start', handleCallStart)
       vapi.off('speech-start', handleSpeechStart)
       vapi.off('speech-end', handleSpeechEnd)
       vapi.off('call-end', handleCallEnd)
       vapi.off('message', handleMessage)
-      vapi.off('status-update')
     }
   }, [])
 
@@ -1242,30 +1161,12 @@ Contoh:
     vapi.start(assistantOptions)
   }
 
-  const stopInterview = async () => {
+  const stopInterview = () => {
     if (isCallActive) {
-      try {
-        // Stop the call first
-        await vapi.stop()
-        setIsCallActive(false)
-        setTimerActive(false)
-        
-        // Wait a bit to ensure we get the final conversation state
-        setTimeout(() => {
-          // Use the latest conversation data from state
-          const currentConversation = conversation || { 
-            messages: transcriptRef.current.length > 0 ? transcriptRef.current : [
-              { role: 'assistant', content: 'Wawancara tidak menghasilkan respons yang cukup.' },
-              { role: 'user', content: 'Maaf, terjadi masalah teknis.' }
-            ]
-          }
-          
-          generateFeedback(currentConversation)
-        }, 1000)
-      } catch (err) {
-        console.error('Error stopping interview:', err)
-        toast.error('Error stopping interview')
-      }
+      vapi.stop()
+      setIsCallActive(false)
+      setTimerActive(false)
+      GenerateFeedback()
     }
   }
 
@@ -1278,110 +1179,17 @@ Contoh:
       .padStart(2, '0')}.${secs.toString().padStart(2, '0')}`
   }
 
-  const generateFeedback = async (conversationData = null) => {
-    // Prevent duplicate feedback generation
-    if (feedbackGeneratedRef.current) {
-      console.log('Feedback already being generated, skipping duplicate request')
-      return
-    }
-    
+  const GenerateFeedback = async () => {
+    if (feedbackGeneratedRef.current) return
     feedbackGeneratedRef.current = true
-    setLoading(true)
-    
-    try {
-      // Use provided conversationData if available, otherwise use state
-      const dataToUse = conversationData || conversation
-      
-      console.log('Generating feedback for conversation:', dataToUse)
-      
-      // Show toast to indicate feedback generation has started
-      toast.loading('Generating interview feedback...', { id: 'feedback-gen', duration: 20000 })
-      
-      // Add retry logic with increased timeout
-      const maxRetries = 3
-      let attempt = 0
-      let result = null
-      
-      while (attempt < maxRetries && !result) {
-        try {
-          attempt++
-          console.log(`Attempt ${attempt} to generate feedback...`)
-          
-          result = await axios.post('/api/ai-feedback', {
-            conversation: dataToUse,
-          }, {
-            timeout: 30000 // 30 second timeout
-          })
-          
-          console.log('Feedback API response:', result.data)
-        } catch (err) {
-          console.error(`Attempt ${attempt} failed:`, err)
-          if (attempt >= maxRetries) throw err
-          
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          
-          // If we have a timeout, perhaps try with a simplified conversation
-          if (err.code === 'ECONNABORTED' || (err.response && err.response.status === 504)) {
-            console.log('Timeout occurred, simplifying conversation data for next attempt')
-            
-            // Create a simplified version with just the essentials
-            if (dataToUse && dataToUse.messages && dataToUse.messages.length > 10) {
-              // Keep only every other message pair to reduce size
-              const simplifiedMessages = []
-              for (let i = 0; i < dataToUse.messages.length; i += 2) {
-                if (i < dataToUse.messages.length) simplifiedMessages.push(dataToUse.messages[i])
-                if (i+1 < dataToUse.messages.length) simplifiedMessages.push(dataToUse.messages[i+1])
-              }
-              
-              dataToUse.messages = simplifiedMessages
-            }
-          }
-        }
-      }
-      
-      if (!result) {
-        throw new Error('All attempts to generate feedback failed')
-      }
 
-      toast.success('Feedback generated successfully', { id: 'feedback-gen' })
+    try {
+      const result = await axios.post('/api/ai-feedback', {
+        conversation: conversation,
+      })
 
       const Content = result.data.content
-      // More robust JSON parsing
-      let parsedContent = null
-      try {
-        // Try direct parsing first
-        parsedContent = JSON.parse(Content)
-      } catch (e) {
-        console.log('Direct parsing failed, trying to extract JSON from response', e)
-        // If that fails, try to extract JSON from markdown code blocks
-        const jsonMatch = Content.match(/```json([\s\S]*?)```/) || Content.match(/```([\s\S]*?)```/)
-        if (jsonMatch && jsonMatch[1]) {
-          try {
-            parsedContent = JSON.parse(jsonMatch[1].trim())
-          } catch (e2) {
-            console.error('Failed to parse JSON from markdown block', e2)
-          }
-        }
-        
-        // If still failed, try to find JSON-like structure anywhere in the text
-        if (!parsedContent) {
-          const jsonObjectMatch = Content.match(/{[\s\S]*}/);
-          if (jsonObjectMatch) {
-            try {
-              parsedContent = JSON.parse(jsonObjectMatch[0])
-            } catch (e3) {
-              console.error('Failed to parse JSON from text', e3)
-            }
-          }
-        }
-      }
-      
-      if (!parsedContent) {
-        throw new Error('Failed to parse feedback content as JSON')
-      }
-
-      console.log('Parsed feedback content:', parsedContent)
+      const FINAL_CONTENT = Content.replace('```json', '').replace('```', '')
 
       const { data, error } = await supabase
         .from('interview-feedback')
@@ -1390,28 +1198,25 @@ Contoh:
             userName: interviewInfo?.userName,
             userEmail: interviewInfo?.userEmail,
             interview_id: interview_id,
-            feedback: parsedContent,
-            recommended: parsedContent?.umpanBalik?.rekomendasi === 'DIREKOMENDASIKAN',
+            feedback: JSON.parse(FINAL_CONTENT),
+            recommended: false,
           },
         ])
         .select()
 
-      if (error) {
-        throw new Error(`Supabase error: ${error.message}`)
-      }
-      
-      console.log('Feedback saved to database:', data)
+      console.log(data)
       router.replace('/interview/' + interview_id + '/completed')
     } catch (err) {
       console.error('Feedback generation failed:', err)
-      toast.error(`Failed to generate feedback: ${err.message}`, { id: 'feedback-gen', duration: 5000 })
-      
-      // Reset the flag to allow retrying
-      feedbackGeneratedRef.current = false
     } finally {
       setLoading(false)
     }
   }
+  
+
+ 
+  
+
 
   return (
     <div className="p-20 lg:px-48 xl:px-56">
@@ -1464,22 +1269,7 @@ Contoh:
         </AlertConfirmation>
       </div>
 
-      <div className="mt-5">
-        <h2 className="text-sm text-gray-400 text-center">
-          {isCallActive 
-            ? 'Interview in progress...' 
-            : loading 
-              ? 'Generating feedback...' 
-              : 'Click the phone icon to start the interview'}
-        </h2>
-        {transcript.length > 0 && (
-          <div className="mt-3">
-            <p className="text-xs text-gray-400 text-center">
-              {transcript.length} interview exchanges recorded
-            </p>
-          </div>
-        )}
-      </div>
+      <h2 className="text-sm text-gray-400 text-center mt-5">Interview in progress...</h2>
     </div>
   )
 }
