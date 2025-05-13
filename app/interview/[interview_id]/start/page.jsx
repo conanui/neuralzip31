@@ -702,7 +702,14 @@ function StartInterview() {
     const handleMessage = (message) => {
       console.log('Received message:', message)
       if (message?.conversation) {
-        setConversation((prev) => [...prev, ...message.conversation])
+        // Filter pesan baru yang belum ada di state conversation
+        const newMessages = message.conversation.filter(
+          (msg) => !conversation.some(
+            (existingMsg) => existingMsg.content === msg.content && existingMsg.role === msg.role
+          )
+        )
+        // Tambahkan hanya pesan baru ke state
+        setConversation((prev) => [...prev, ...newMessages])
       }
     }
 
@@ -719,7 +726,7 @@ function StartInterview() {
       vapi.off('call-end', handleCallEnd)
       vapi.off('message', handleMessage)
     }
-  }, [])
+  }, [conversation]) // Tambahkan conversation sebagai dependency
 
   const startCall = () => {
     const questions = interviewInfo?.interviewData?.questionList
@@ -806,7 +813,16 @@ Contoh:
       })
 
       const Content = result.data.content
-      const FINAL_CONTENT = Content.replace('```json', '').replace('```', '')
+      const FINAL_CONTENT = Content.replace(/```json|```/g, '').trim()
+
+      let feedbackData
+      try {
+        feedbackData = JSON.parse(FINAL_CONTENT)
+      } catch (parseError) {
+        console.error('Failed to parse JSON:', parseError)
+        console.error('Invalid JSON content:', FINAL_CONTENT)
+        return
+      }
 
       const { data, error } = await supabase
         .from('interview-feedback')
@@ -815,7 +831,7 @@ Contoh:
             userName: interviewInfo?.userName,
             userEmail: interviewInfo?.userEmail,
             interview_id: interview_id,
-            feedback: JSON.parse(FINAL_CONTENT),
+            feedback: feedbackData,
             conversation_interview: conversation,
             recommended: false,
           },
