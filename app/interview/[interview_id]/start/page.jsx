@@ -639,20 +639,10 @@ function StartInterview() {
   const [timer, setTimer] = useState(0)
   const [timerActive, setTimerActive] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
-  const [conversation, setConversation] = useState([])
-  const [finalConversation, setFinalConversation] = useState([])
+  const [conversation, setConversation] = useState()
   const { interview_id } = useParams()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-
-  // Collect message chunks by role
-  const messageBufferRef = useRef({
-    assistant: '',
-    user: ''
-  })
-  
-  // Track which role is currently speaking
-  const currentSpeakerRef = useRef('')
 
   // Stabilkan Vapi instance
   const vapiRef = useRef(null)
@@ -682,27 +672,6 @@ function StartInterview() {
     return () => clearInterval(interval)
   }, [timerActive])
 
-  // Add a complete message to final conversation
-  const addToFinalConversation = (role, content) => {
-    if (!role || !content || content.trim() === '') return
-
-    console.log(`Adding complete message: ${role}: ${content}`)
-    
-    setFinalConversation(prev => {
-      // Avoid duplicates
-      const isDuplicate = prev.some(msg => 
-        msg.role === role && msg.content === content
-      )
-      
-      if (isDuplicate) return prev
-      
-      return [...prev, { role, content }]
-    })
-    
-    // Clear the buffer for this role
-    messageBufferRef.current[role] = ''
-  }
-
   useEffect(() => {
     const handleCallStart = () => {
       console.log('Call started')
@@ -710,37 +679,16 @@ function StartInterview() {
       setIsCallActive(true)
       setTimerActive(true)
       setTimer(0)
-      
-      // Reset buffers
-      messageBufferRef.current = {
-        assistant: '',
-        user: ''
-      }
-      setFinalConversation([])
     }
 
     const handleSpeechStart = () => {
       console.log('Assistant speaking')
       setActiveUser(false)
-      
-      // If user was speaking, finalize their message
-      if (currentSpeakerRef.current === 'user' && messageBufferRef.current.user) {
-        addToFinalConversation('user', messageBufferRef.current.user)
-      }
-      
-      currentSpeakerRef.current = 'assistant'
     }
 
     const handleSpeechEnd = () => {
       console.log('Assistant done')
       setActiveUser(true)
-      
-      // Add complete assistant message to final conversation
-      if (messageBufferRef.current.assistant) {
-        addToFinalConversation('assistant', messageBufferRef.current.assistant)
-      }
-      
-      currentSpeakerRef.current = 'user'
     }
 
     const handleCallEnd = () => {
@@ -748,39 +696,12 @@ function StartInterview() {
       toast('Interview Ended', { id: 'call-end', duration: 2000 })
       setIsCallActive(false)
       setTimerActive(false)
-      
-      // Finalize any pending messages
-      if (messageBufferRef.current.assistant) {
-        addToFinalConversation('assistant', messageBufferRef.current.assistant)
-      }
-      if (messageBufferRef.current.user) {  
-        addToFinalConversation('user', messageBufferRef.current.user)
-      }
-      
-      setTimeout(() => GenerateFeedback(), 1000) // Tunggu 1 detik
+      GenerateFeedback()
     }
 
     const handleMessage = (message) => {
-      if (!message?.conversation) return
-      
-      // Store raw conversation for debugging if needed
-      const newMessages = message.conversation.filter(
-        (msg) => !conversation.some(
-          (existingMsg) => existingMsg.content === msg.content && existingMsg.role === msg.role
-        )
-      )
-      setConversation((prev) => [...prev, ...newMessages])
-      
-      // Process each message chunk and add to appropriate buffer
-      newMessages.forEach(msg => {
-        const { role, content } = msg
-        
-        if (!role || content === undefined) return
-        
-        if (role === 'assistant' || role === 'user') {
-          messageBufferRef.current[role] += content
-        }
-      })
+      console.log(message?.conversation)
+      setConversation(message?.conversation)
     }
 
     vapi.on('call-start', handleCallStart)
@@ -796,7 +717,7 @@ function StartInterview() {
       vapi.off('call-end', handleCallEnd)
       vapi.off('message', handleMessage)
     }
-  }, [conversation]) // Tambahkan conversation sebagai dependency
+  }, [])
 
   const startCall = () => {
     const questions = interviewInfo?.interviewData?.questionList
@@ -853,16 +774,7 @@ Contoh:
       vapi.stop()
       setIsCallActive(false)
       setTimerActive(false)
-      
-      // Finalize any pending messages
-      if (messageBufferRef.current.assistant) {
-        addToFinalConversation('assistant', messageBufferRef.current.assistant)
-      }
-      if (messageBufferRef.current.user) {  
-        addToFinalConversation('user', messageBufferRef.current.user)
-      }
-      
-      setTimeout(() => GenerateFeedback(), 1000) // Tunggu 1 detik
+      GenerateFeedback()
     }
   }
 
@@ -879,30 +791,13 @@ Contoh:
     if (feedbackGeneratedRef.current) return
     feedbackGeneratedRef.current = true
 
-    // Use the final conversation with complete sentences
-    console.log('Generating feedback with final conversation:', finalConversation)
-
-    if (!finalConversation || finalConversation.length === 0) {
-      console.error('Final conversation is empty. Cannot generate feedback.')
-      return
-    }
-
     try {
       const result = await axios.post('/api/ai-feedback', {
-        conversation: finalConversation,
+        conversation: conversation,
       })
 
       const Content = result.data.content
-      const FINAL_CONTENT = Content.replace(/```json|```/g, '').trim()
-
-      let feedbackData
-      try {
-        feedbackData = JSON.parse(FINAL_CONTENT)
-      } catch (parseError) {
-        console.error('Failed to parse JSON:', parseError)
-        console.error('Invalid JSON content:', FINAL_CONTENT)
-        return
-      }
+      const FINAL_CONTENT = Content.replace('```json', '').replace('```', '')
 
       const { data, error } = await supabase
         .from('interview-feedback')
@@ -911,25 +806,25 @@ Contoh:
             userName: interviewInfo?.userName,
             userEmail: interviewInfo?.userEmail,
             interview_id: interview_id,
-            feedback: feedbackData,
-            conversation_interview: finalConversation, // Store final consolidated conversation
+            feedback: JSON.parse(FINAL_CONTENT),
             recommended: false,
           },
         ])
         .select()
 
-      if (error) {
-        console.error('Error inserting data to Supabase:', error)
-      } else {
-        console.log('Data inserted successfully:', data)
-        router.replace('/interview/' + interview_id + '/completed')
-      }
+      console.log(data)
+      router.replace('/interview/' + interview_id + '/completed')
     } catch (err) {
       console.error('Feedback generation failed:', err)
     } finally {
       setLoading(false)
     }
   }
+  
+
+ 
+  
+
 
   return (
     <div className="p-20 lg:px-48 xl:px-56">
@@ -986,7 +881,5 @@ Contoh:
     </div>
   )
 }
-
-export default StartInterview
 
 export default StartInterview
