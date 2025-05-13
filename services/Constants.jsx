@@ -102,7 +102,7 @@ format: interviewQuestions=[
 Tujuan akhir Anda adalah menciptakan rencana wawancara yang efektif, terstruktur, dan sesuai waktu untuk posisi {{jobTitle}}.
 `.trim();
 
-/*
+
 export const FEEDBACK_PROMPT=`
 {{conversation}}
 
@@ -124,10 +124,10 @@ Berikan jawaban dalam format JSON seperti berikut:
 {
     umpanBalik: {
         penilaian: {
-            kemampuanTeknis: ,
-            komunikasi: ,
-            pemecahanMasalah: ,
-            pengalaman: 
+            kemampuanTeknis:7 ,
+            komunikasi:7 ,
+            pemecahanMasalah:6 ,
+            pengalaman: 8
         },
         ringkasan: <dalam 3 kalimat>,
         rekomendasi: '',
@@ -135,108 +135,3 @@ Berikan jawaban dalam format JSON seperti berikut:
     }
 }`
 
-*/
-
-/*export const FEEDBACK_PROMPT = `Analisis Wawancara:
-
-{{conversation}}
-
-Berdasarkan percakapan wawancara antara pewawancara dan kandidat di atas, berikan evaluasi objektif dan menyeluruh dengan mengikuti instruksi berikut:
-
-1. PENILAIAN OBJEKTIF (skala 1-10):
-   - Kemampuan Teknis: Evaluasi pemahaman kandidat tentang konsep teknis, kedalaman pengetahuan, dan kemampuan menjelaskan solusi teknis.
-   - Komunikasi: Nilai kejelasan, struktur, dan efektivitas penyampaian informasi oleh kandidat.
-   - Pemecahan Masalah: Nilai pendekatan kandidat terhadap masalah, metode analisis, dan kualitas solusi yang diusulkan.
-   - Pengalaman: Evaluasi relevansi dan kedalaman pengalaman kandidat terhadap posisi yang dilamar.
-
-2. KRITERIA PENILAIAN:
-   - 0: Tidak ada jawaban sama sekali
-   - 1-3: Di bawah ekspektasi, jawaban sangat lemah atau tidak memadai
-   - 4-6: Memenuhi ekspektasi dasar, jawaban cukup tapi tidak menonjol
-   - 7-8: Di atas ekspektasi, jawaban berkualitas tinggi
-   - 9-10: Luar biasa, jawaban sangat mendalam dan menunjukkan keahlian tingkat tinggi
-
-3. ANALISIS WAWANCARA:
-   - Berikan ringkasan hasil wawancara dalam 3 kalimat yang mencakup kekuatan dan kelemahan utama kandidat.
-   - Berikan rekomendasi "DIREKOMENDASIKAN" atau "TIDAK DIREKOMENDASIKAN" berdasarkan penilaian objektif.
-   - Jelaskan alasan rekomendasi Anda dalam satu kalimat yang jelas dan padat.
-
-PENTING: 
-- Nilai kandidat secara ADIL berdasarkan kualitas jawaban mereka.
-- Jangan memberikan nilai rendah kecuali jawaban benar-benar tidak memadai atau tidak relevan.
-- Jika kandidat menjawab pertanyaan, meskipun jawabannya singkat tetapi relevan, berikan minimal nilai 4 untuk kategori tersebut.
-- Jika kandidat memberikan jawaban yang baik, berikan setidaknya nilai 7.
-- Anggap semua jawaban kandidat adalah upaya yang tulus untuk menjawab pertanyaan.
-- Nilai 0 hanya diberikan jika kandidat benar-benar tidak memberikan jawaban.
-
-Berikan jawaban dalam format JSON berikut:
-
-{
-    "umpanBalik": {
-        "penilaian": {
-            "kemampuanTeknis": [nilai 0-10],
-            "komunikasi": [nilai 0-10],
-            "pemecahanMasalah": [nilai 0-10],
-            "pengalaman":  [nilai 0-10],
-            "keseluruhan": [nilai 0-10]
-        },
-        "ringkasan": "[Ringkasan dalam 3 kalimat]",
-        "rekomendasi": "[DIREKOMENDASIKAN/TIDAK DIREKOMENDASIKAN]",
-        "pesanRekomendasi": "[Alasan rekomendasi dalam 1 kalimat]"
-    }
-}`;*/
-
-
-export const FEEDBACK_PROMPT = `
-Analisis Wawancara:
-
-{{conversation}}
-
-Berdasarkan percakapan wawancara antara pewawancara dan kandidat di atas, berikan evaluasi objektif dan menyeluruh dengan mengikuti instruksi berikut:
-
-1. PENILAIAN OBJEKTIF (skala 1-10):
-   - Kemampuan Teknis: Evaluasi pemahaman kandidat tentang konsep teknis, kedalaman pengetahuan, dan kemampuan menjelaskan solusi teknis.
-   - Komunikasi: Nilai kejelasan, struktur, dan efektivitas penyampaian informasi oleh kandidat.
-   - Pemecahan Masalah: Nilai pendekatan kandidat terhadap masalah, metode analisis, dan kualitas solusi yang diusulkan.
-   - Pengalaman: Evaluasi relevansi dan kedalaman pengalaman kandidat terhadap posisi yang dilamar.
-
-2. KRITERIA PENILAIAN:
-   - 0: Tidak ada jawaban sama sekali
-   - 1-3: Di bawah ekspektasi, jawaban sangat lemah atau tidak memadai
-   - 4-6: Memenuhi ekspektasi dasar, jawaban cukup tapi tidak menonjol
-   - 7-8: Di atas ekspektasi, jawaban berkualitas tinggi
-   - 9-10: Luar biasa, jawaban sangat mendalam dan menunjukkan keahlian tingkat tinggi
-
-3. ANALISIS WAWANCARA:
-   - Berikan ringkasan hasil wawancara dalam 3 kalimat yang mencakup kekuatan dan kelemahan utama kandidat.
-   - Berikan rekomendasi "DIREKOMENDASIKAN" atau "TIDAK DIREKOMENDASIKAN" berdasarkan penilaian objektif.
-   - Jelaskan alasan rekomendasi Anda dalam satu kalimat yang jelas dan padat.
-
-PENTING: 
-- Nilai kandidat secara ADIL berdasarkan kualitas jawaban mereka.
-- Jangan memberikan nilai rendah kecuali jawaban benar-benar tidak memadai atau tidak relevan.
-- Jika kandidat menjawab pertanyaan, meskipun jawabannya singkat tetapi relevan, berikan minimal nilai 4 untuk kategori tersebut.
-- Jika kandidat memberikan jawaban yang baik, berikan setidaknya nilai 7.
-- Anggap semua jawaban kandidat adalah upaya yang tulus untuk menjawab pertanyaan.
-- Nilai 0 hanya diberikan jika kandidat benar-benar tidak memberikan jawaban.
-
-Berikan jawaban dalam format JSON berikut:
-
-{
-    "umpanBalik": {
-        "penilaian": {
-            "kemampuanTeknis": [nilai 0-10],
-            "komunikasi": [nilai 0-10],
-            "pemecahanMasalah": [nilai 0-10],
-            "pengalaman":  [nilai 0-10],
-            "keseluruhan": [nilai 0-10]
-        },
-        "ringkasan": "[Ringkasan dalam 3 kalimat]",
-        "rekomendasi": "[DIREKOMENDASIKAN/TIDAK DIREKOMENDASIKAN]",
-        "pesanRekomendasi": "[Alasan rekomendasi dalam 1 kalimat]"
-    }
-}
-`
-
-
-      
