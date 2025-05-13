@@ -640,9 +640,17 @@ function StartInterview() {
   const [timerActive, setTimerActive] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
   const [conversation, setConversation] = useState([])
+  const [consolidatedConversation, setConsolidatedConversation] = useState([])
   const { interview_id } = useParams()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+
+  // Current message being built
+  const currentMessageRef = useRef({
+    role: '',
+    content: '',
+    complete: true
+  })
 
   // Stabilkan Vapi instance
   const vapiRef = useRef(null)
@@ -672,6 +680,55 @@ function StartInterview() {
     return () => clearInterval(interval)
   }, [timerActive])
 
+  // Process and consolidate messages
+  const consolidateMessages = (newMessage) => {
+    const { role, content } = newMessage
+    
+    // If current message is complete or role changed, start a new message
+    if (currentMessageRef.current.complete || currentMessageRef.current.role !== role) {
+      // Save previous message if it exists and isn't empty
+      if (currentMessageRef.current.role && currentMessageRef.current.content.trim()) {
+        setConsolidatedConversation(prev => [
+          ...prev, 
+          {
+            role: currentMessageRef.current.role,
+            content: currentMessageRef.current.content.trim()
+          }
+        ])
+      }
+      
+      // Start new message
+      currentMessageRef.current = {
+        role,
+        content,
+        complete: false
+      }
+    } else {
+      // Append to existing message
+      currentMessageRef.current.content += content
+    }
+  }
+
+  // Finalize current message
+  const finalizeCurrentMessage = () => {
+    if (currentMessageRef.current.role && currentMessageRef.current.content.trim()) {
+      setConsolidatedConversation(prev => [
+        ...prev, 
+        {
+          role: currentMessageRef.current.role,
+          content: currentMessageRef.current.content.trim()
+        }
+      ])
+      
+      // Reset current message
+      currentMessageRef.current = {
+        role: '',
+        content: '',
+        complete: true
+      }
+    }
+  }
+
   useEffect(() => {
     const handleCallStart = () => {
       console.log('Call started')
@@ -689,6 +746,9 @@ function StartInterview() {
     const handleSpeechEnd = () => {
       console.log('Assistant done')
       setActiveUser(true)
+      // Assistant finished speaking, mark current message as complete
+      currentMessageRef.current.complete = true
+      finalizeCurrentMessage()
     }
 
     const handleCallEnd = () => {
@@ -696,20 +756,26 @@ function StartInterview() {
       toast('Interview Ended', { id: 'call-end', duration: 2000 })
       setIsCallActive(false)
       setTimerActive(false)
+      
+      // Finalize any pending message
+      finalizeCurrentMessage()
+      
       setTimeout(() => GenerateFeedback(), 1000) // Tunggu 1 detik
     }
 
     const handleMessage = (message) => {
       console.log('Received message:', message)
       if (message?.conversation) {
-        // Filter pesan baru yang belum ada di state conversation
+        // Store raw conversation for debugging if needed
         const newMessages = message.conversation.filter(
           (msg) => !conversation.some(
             (existingMsg) => existingMsg.content === msg.content && existingMsg.role === msg.role
           )
         )
-        // Tambahkan hanya pesan baru ke state
         setConversation((prev) => [...prev, ...newMessages])
+        
+        // Process each new message for consolidation
+        newMessages.forEach(msg => consolidateMessages(msg))
       }
     }
 
@@ -783,6 +849,10 @@ Contoh:
       vapi.stop()
       setIsCallActive(false)
       setTimerActive(false)
+      
+      // Finalize any pending message
+      finalizeCurrentMessage()
+      
       setTimeout(() => GenerateFeedback(), 1000) // Tunggu 1 detik
     }
   }
@@ -800,16 +870,17 @@ Contoh:
     if (feedbackGeneratedRef.current) return
     feedbackGeneratedRef.current = true
 
-    console.log('Generating feedback with conversation:', conversation)
+    // Use the consolidated conversation instead of raw fragments
+    console.log('Generating feedback with consolidated conversation:', consolidatedConversation)
 
-    if (!conversation || conversation.length === 0) {
-      console.error('Conversation is empty. Cannot generate feedback.')
+    if (!consolidatedConversation || consolidatedConversation.length === 0) {
+      console.error('Consolidated conversation is empty. Cannot generate feedback.')
       return
     }
 
     try {
       const result = await axios.post('/api/ai-feedback', {
-        conversation: conversation,
+        conversation: consolidatedConversation,
       })
 
       const Content = result.data.content
@@ -832,7 +903,7 @@ Contoh:
             userEmail: interviewInfo?.userEmail,
             interview_id: interview_id,
             feedback: feedbackData,
-            conversation_interview: conversation,
+            conversation_interview: consolidatedConversation, // Store consolidated conversation
             recommended: false,
           },
         ])
