@@ -640,17 +640,19 @@ function StartInterview() {
   const [timerActive, setTimerActive] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
   const [conversation, setConversation] = useState([])
-  const [consolidatedConversation, setConsolidatedConversation] = useState([])
+  const [finalConversation, setFinalConversation] = useState([])
   const { interview_id } = useParams()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
-  // Current message being built
-  const currentMessageRef = useRef({
-    role: '',
-    content: '',
-    complete: true
+  // Collect message chunks by role
+  const messageBufferRef = useRef({
+    assistant: '',
+    user: ''
   })
+  
+  // Track which role is currently speaking
+  const currentSpeakerRef = useRef('')
 
   // Stabilkan Vapi instance
   const vapiRef = useRef(null)
@@ -680,53 +682,25 @@ function StartInterview() {
     return () => clearInterval(interval)
   }, [timerActive])
 
-  // Process and consolidate messages
-  const consolidateMessages = (newMessage) => {
-    const { role, content } = newMessage
-    
-    // If current message is complete or role changed, start a new message
-    if (currentMessageRef.current.complete || currentMessageRef.current.role !== role) {
-      // Save previous message if it exists and isn't empty
-      if (currentMessageRef.current.role && currentMessageRef.current.content.trim()) {
-        setConsolidatedConversation(prev => [
-          ...prev, 
-          {
-            role: currentMessageRef.current.role,
-            content: currentMessageRef.current.content.trim()
-          }
-        ])
-      }
-      
-      // Start new message
-      currentMessageRef.current = {
-        role,
-        content,
-        complete: false
-      }
-    } else {
-      // Append to existing message
-      currentMessageRef.current.content += content
-    }
-  }
+  // Add a complete message to final conversation
+  const addToFinalConversation = (role, content) => {
+    if (!role || !content || content.trim() === '') return
 
-  // Finalize current message
-  const finalizeCurrentMessage = () => {
-    if (currentMessageRef.current.role && currentMessageRef.current.content.trim()) {
-      setConsolidatedConversation(prev => [
-        ...prev, 
-        {
-          role: currentMessageRef.current.role,
-          content: currentMessageRef.current.content.trim()
-        }
-      ])
+    console.log(`Adding complete message: ${role}: ${content}`)
+    
+    setFinalConversation(prev => {
+      // Avoid duplicates
+      const isDuplicate = prev.some(msg => 
+        msg.role === role && msg.content === content
+      )
       
-      // Reset current message
-      currentMessageRef.current = {
-        role: '',
-        content: '',
-        complete: true
-      }
-    }
+      if (isDuplicate) return prev
+      
+      return [...prev, { role, content }]
+    })
+    
+    // Clear the buffer for this role
+    messageBufferRef.current[role] = ''
   }
 
   useEffect(() => {
@@ -736,19 +710,37 @@ function StartInterview() {
       setIsCallActive(true)
       setTimerActive(true)
       setTimer(0)
+      
+      // Reset buffers
+      messageBufferRef.current = {
+        assistant: '',
+        user: ''
+      }
+      setFinalConversation([])
     }
 
     const handleSpeechStart = () => {
       console.log('Assistant speaking')
       setActiveUser(false)
+      
+      // If user was speaking, finalize their message
+      if (currentSpeakerRef.current === 'user' && messageBufferRef.current.user) {
+        addToFinalConversation('user', messageBufferRef.current.user)
+      }
+      
+      currentSpeakerRef.current = 'assistant'
     }
 
     const handleSpeechEnd = () => {
       console.log('Assistant done')
       setActiveUser(true)
-      // Assistant finished speaking, mark current message as complete
-      currentMessageRef.current.complete = true
-      finalizeCurrentMessage()
+      
+      // Add complete assistant message to final conversation
+      if (messageBufferRef.current.assistant) {
+        addToFinalConversation('assistant', messageBufferRef.current.assistant)
+      }
+      
+      currentSpeakerRef.current = 'user'
     }
 
     const handleCallEnd = () => {
@@ -757,26 +749,38 @@ function StartInterview() {
       setIsCallActive(false)
       setTimerActive(false)
       
-      // Finalize any pending message
-      finalizeCurrentMessage()
+      // Finalize any pending messages
+      if (messageBufferRef.current.assistant) {
+        addToFinalConversation('assistant', messageBufferRef.current.assistant)
+      }
+      if (messageBufferRef.current.user) {  
+        addToFinalConversation('user', messageBufferRef.current.user)
+      }
       
       setTimeout(() => GenerateFeedback(), 1000) // Tunggu 1 detik
     }
 
     const handleMessage = (message) => {
-      console.log('Received message:', message)
-      if (message?.conversation) {
-        // Store raw conversation for debugging if needed
-        const newMessages = message.conversation.filter(
-          (msg) => !conversation.some(
-            (existingMsg) => existingMsg.content === msg.content && existingMsg.role === msg.role
-          )
+      if (!message?.conversation) return
+      
+      // Store raw conversation for debugging if needed
+      const newMessages = message.conversation.filter(
+        (msg) => !conversation.some(
+          (existingMsg) => existingMsg.content === msg.content && existingMsg.role === msg.role
         )
-        setConversation((prev) => [...prev, ...newMessages])
+      )
+      setConversation((prev) => [...prev, ...newMessages])
+      
+      // Process each message chunk and add to appropriate buffer
+      newMessages.forEach(msg => {
+        const { role, content } = msg
         
-        // Process each new message for consolidation
-        newMessages.forEach(msg => consolidateMessages(msg))
-      }
+        if (!role || content === undefined) return
+        
+        if (role === 'assistant' || role === 'user') {
+          messageBufferRef.current[role] += content
+        }
+      })
     }
 
     vapi.on('call-start', handleCallStart)
@@ -850,8 +854,13 @@ Contoh:
       setIsCallActive(false)
       setTimerActive(false)
       
-      // Finalize any pending message
-      finalizeCurrentMessage()
+      // Finalize any pending messages
+      if (messageBufferRef.current.assistant) {
+        addToFinalConversation('assistant', messageBufferRef.current.assistant)
+      }
+      if (messageBufferRef.current.user) {  
+        addToFinalConversation('user', messageBufferRef.current.user)
+      }
       
       setTimeout(() => GenerateFeedback(), 1000) // Tunggu 1 detik
     }
@@ -870,17 +879,17 @@ Contoh:
     if (feedbackGeneratedRef.current) return
     feedbackGeneratedRef.current = true
 
-    // Use the consolidated conversation instead of raw fragments
-    console.log('Generating feedback with consolidated conversation:', consolidatedConversation)
+    // Use the final conversation with complete sentences
+    console.log('Generating feedback with final conversation:', finalConversation)
 
-    if (!consolidatedConversation || consolidatedConversation.length === 0) {
-      console.error('Consolidated conversation is empty. Cannot generate feedback.')
+    if (!finalConversation || finalConversation.length === 0) {
+      console.error('Final conversation is empty. Cannot generate feedback.')
       return
     }
 
     try {
       const result = await axios.post('/api/ai-feedback', {
-        conversation: consolidatedConversation,
+        conversation: finalConversation,
       })
 
       const Content = result.data.content
@@ -903,7 +912,7 @@ Contoh:
             userEmail: interviewInfo?.userEmail,
             interview_id: interview_id,
             feedback: feedbackData,
-            conversation_interview: consolidatedConversation, // Store consolidated conversation
+            conversation_interview: finalConversation, // Store final consolidated conversation
             recommended: false,
           },
         ])
@@ -977,5 +986,7 @@ Contoh:
     </div>
   )
 }
+
+export default StartInterview
 
 export default StartInterview
