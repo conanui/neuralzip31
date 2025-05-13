@@ -632,26 +632,23 @@ import axios from 'axios'
 import { supabase } from '@/services/supabaseClient'
 import { useParams, useRouter } from 'next/navigation'
 
-function StartInterview() {
+export default function StartInterview() {
   const { interviewInfo } = useContext(InterviewDataContext)
   const [activeUser, setActiveUser] = useState(false)
   const [isCallActive, setIsCallActive] = useState(false)
   const [timer, setTimer] = useState(0)
   const [timerActive, setTimerActive] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
-  const [conversation, setConversation] = useState()
+  const [conversation, setConversation] = useState([])
   const { interview_id } = useParams()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
-  // Stabilkan Vapi instance
   const vapiRef = useRef(null)
   if (!vapiRef.current) {
     vapiRef.current = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY)
   }
   const vapi = vapiRef.current
-
-  // Cegah multiple feedback
   const feedbackGeneratedRef = useRef(false)
 
   useEffect(() => {
@@ -661,90 +658,60 @@ function StartInterview() {
     }
   }, [interviewInfo, hasStarted])
 
-  // Timer
   useEffect(() => {
     let interval
     if (timerActive) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev + 1)
-      }, 1000)
+      interval = setInterval(() => setTimer(prev => prev + 1), 1000)
     }
     return () => clearInterval(interval)
   }, [timerActive])
 
   useEffect(() => {
-    const handleCallStart = () => {
-      console.log('Call started')
+    const onStart = () => {
       toast('Call Connected...', { id: 'call-start', duration: 2000 })
       setIsCallActive(true)
       setTimerActive(true)
       setTimer(0)
     }
-
-    const handleSpeechStart = () => {
-      console.log('Assistant speaking')
-      setActiveUser(false)
-    }
-
-    const handleSpeechEnd = () => {
-      console.log('Assistant done')
-      setActiveUser(true)
-    }
-
-    const handleCallEnd = () => {
-      console.log('Call ended')
+    const onSpeechStart = () => setActiveUser(false)
+    const onSpeechEnd = () => setActiveUser(true)
+    const onEnd = () => {
       toast('Interview Ended', { id: 'call-end', duration: 2000 })
       setIsCallActive(false)
       setTimerActive(false)
-      GenerateFeedback()
+      generateFeedback()
     }
+    const onMessage = (msg) => setConversation(msg.conversation || [])
 
-    const handleMessage = (message) => {
-      console.log(message?.conversation)
-      setConversation(message?.conversation)
-    }
-
-    vapi.on('call-start', handleCallStart)
-    vapi.on('speech-start', handleSpeechStart)
-    vapi.on('speech-end', handleSpeechEnd)
-    vapi.on('call-end', handleCallEnd)
-    vapi.on('message', handleMessage)
-
+    vapi.on('call-start', onStart)
+    vapi.on('speech-start', onSpeechStart)
+    vapi.on('speech-end', onSpeechEnd)
+    vapi.on('call-end', onEnd)
+    vapi.on('message', onMessage)
     return () => {
-      vapi.off('call-start', handleCallStart)
-      vapi.off('speech-start', handleSpeechStart)
-      vapi.off('speech-end', handleSpeechEnd)
-      vapi.off('call-end', handleCallEnd)
-      vapi.off('message', handleMessage)
+      vapi.off('call-start', onStart)
+      vapi.off('speech-start', onSpeechStart)
+      vapi.off('speech-end', onSpeechEnd)
+      vapi.off('call-end', onEnd)
+      vapi.off('message', onMessage)
     }
-  }, [])
+  }, [vapi])
 
   const startCall = () => {
-    const questions = interviewInfo?.interviewData?.questionList
-      ?.map((q) => q.question)
+    const questions = interviewInfo.interviewData.questionList
+      .map(q => q.question)
       .filter(Boolean)
       .join(', ')
 
     const assistantOptions = {
       name: 'AI Interviewer',
-      firstMessage: `Halo ${interviewInfo?.userName}, selamat datang di wawancara untuk posisi ${interviewInfo?.interviewData?.jobPosition}.`,
-      transcriber: {
-        provider: 'deepgram',
-        model: 'nova-2',
-        language: 'id',
-      },
-      voice: {
-        provider: 'azure',
-        voiceId: 'id-ID-ArdiNeural',
-      },
+      firstMessage: `Halo ${interviewInfo.userName}, selamat datang di wawancara untuk posisi ${interviewInfo.interviewData.jobPosition}.`,
+      transcriber: { provider: 'deepgram', model: 'nova-2', language: 'id' },
+      voice: { provider: 'azure', voiceId: 'id-ID-ArdiNeural' },
       model: {
         provider: 'openai',
         model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: `
-Anda adalah pewawancara AI yang sedang melakukan wawancara untuk posisi ${interviewInfo?.interviewData?.jobPosition}.
+        messages: [{ role: 'system', content: `Anda adalah pewawancara AI yang sedang melakukan wawancara untuk posisi ${interviewInfo.interviewData.jobPosition}.
 
 Tugas Anda adalah:
 1. Mulai dengan perkenalan singkat
@@ -754,16 +721,8 @@ Tugas Anda adalah:
 5. Lanjut ke pertanyaan berikutnya
 6. Akhiri wawancara setelah semua pertanyaan terjawab
 
-Gunakan bahasa yang sederhana dan profesional.
-
-Contoh:
-- "Mari kita mulai dengan pertanyaan pertama: ..."
-- "Terima kasih atas jawaban Anda."
-- "Itu saja untuk hari ini. Terima kasih atas waktunya."
-            `.trim(),
-          },
-        ],
-      },
+Gunakan bahasa yang sederhana dan profesional.`.trim() }]
+      }
     }
 
     vapi.start(assistantOptions)
@@ -774,106 +733,59 @@ Contoh:
       vapi.stop()
       setIsCallActive(false)
       setTimerActive(false)
-      GenerateFeedback()
+      generateFeedback()
     }
   }
 
-  const formatTime = (seconds) => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    return `${hours.toString().padStart(2, '0')}.${minutes
-      .toString()
-      .padStart(2, '0')}.${secs.toString().padStart(2, '0')}`
+  const formatTime = sec => {
+    const h = Math.floor(sec / 3600)
+    const m = Math.floor((sec % 3600) / 60)
+    const s = sec % 60
+    return `${String(h).padStart(2,'0')}.${String(m).padStart(2,'0')}.${String(s).padStart(2,'0')}`
   }
 
-  const GenerateFeedback = async () => {
+  const generateFeedback = async () => {
     if (feedbackGeneratedRef.current) return
     feedbackGeneratedRef.current = true
-
+    setLoading(true)
     try {
-      const result = await axios.post('/api/ai-feedback', {
-        conversation: conversation,
-      })
-
-      const Content = result.data.content
-      const FINAL_CONTENT = Content.replace('```json', '').replace('```', '')
-
-      const { data, error } = await supabase
-        .from('interview-feedback')
-        .insert([
-          {
-            userName: interviewInfo?.userName,
-            userEmail: interviewInfo?.userEmail,
-            interview_id: interview_id,
-            feedback: JSON.parse(FINAL_CONTENT),
-            recommended: false,
-          },
-        ])
-        .select()
-
-      console.log(data)
-      router.replace('/interview/' + interview_id + '/completed')
-    } catch (err) {
-      console.error('Feedback generation failed:', err)
+      const res = await axios.post('/api/ai-feedback', { conversation })
+      const json = res.data.content.replace(/```json|```/g, '')
+      const feedback = JSON.parse(json)
+      await supabase.from('interview-feedback').insert([{ userName: interviewInfo.userName, userEmail: interviewInfo.userEmail, interview_id, feedback, recommended: false }])
+      router.replace(`/interview/${interview_id}/completed`)
+    } catch (e) {
+      console.error('Feedback generation failed:', e)
+      toast.error('Gagal generate feedback')
     } finally {
       setLoading(false)
     }
   }
-  
-
- 
-  
-
 
   return (
     <div className="p-20 lg:px-48 xl:px-56">
       <h2 className="font-bold text-xl flex justify-between">
         AI Interview Section
-        <span className="gap-2 items-center flex">
-          <Timer />
-          {formatTime(timer)}
-        </span>
+        <span className="flex items-center gap-2"><Timer />{formatTime(timer)}</span>
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-7 mt-5">
-        <div className="bg-white h-[400px] rounded-lg border flex flex-col gap-3 items-center justify-center">
-          <div className="relative">
-            {!activeUser && (
-              <span className="absolute inset-0 rounded-full bg-blue-500 opacity-75 animate-ping" />
-            )}
-            <Image
-              src="/GAMBAR.png"
-              alt="GAMBAR"
-              width={100}
-              height={100}
-              className="w-[60px] h-[60px] rounded-full object-cover"
-            />
-          </div>
+        <div className="bg-white h-[400px] rounded-lg border flex flex-col items-center justify-center relative">
+          {!activeUser && <span className="absolute inset-0 rounded-full bg-blue-500 opacity-75 animate-ping" />}
+          <Image src="/GAMBAR.png" alt="AI Recruiter" width={100} height={100} className="w-[60px] h-[60px] rounded-full" />
           <h2>AI Recruiter</h2>
         </div>
-
-        <div className="bg-white h-[400px] rounded-lg border flex flex-col gap-3 items-center justify-center">
-          <div className="relative">
-            {activeUser && (
-              <span className="absolute inset-0 rounded-full bg-blue-500 opacity-75 animate-ping" />
-            )}
-            <h2 className="text-2xl bg-blue-500 text-white p-3 rounded-full px-5">
-              {interviewInfo?.userName?.[0]}
-            </h2>
-          </div>
-          <h2>{interviewInfo?.userName}</h2>
+        <div className="bg-white h-[400px] rounded-lg border flex flex-col items-center justify-center relative">
+          {activeUser && <span className="absolute inset-0 rounded-full bg-blue-500 opacity-75 animate-ping" />}
+          <h2 className="text-2xl bg-blue-500 text-white p-3 rounded-full">{interviewInfo.userName?.[0]}</h2>
+          <h2>{interviewInfo.userName}</h2>
         </div>
       </div>
 
       <div className="flex items-center gap-5 justify-center mt-7">
-        <Mic className="h-12 w-12 p-3 bg-gray-400 rounded-full cursor-pointer" />
+        <Mic className="h-12 w-12 p-3 bg-gray-400 rounded-full" />
         <AlertConfirmation stopInterview={stopInterview} setLoading={setLoading}>
-          <Phone
-            className={`h-12 w-12 p-3 rounded-full cursor-pointer ${
-              loading ? 'bg-red-300 animate-spin' : 'bg-red-400'
-            }`}
-          />
+          <Phone className={`h-12 w-12 p-3 rounded-full ${loading ? 'bg-red-300 animate-spin' : 'bg-red-400'}`} />
         </AlertConfirmation>
       </div>
 
@@ -881,5 +793,3 @@ Contoh:
     </div>
   )
 }
-
-export default StartInterview
