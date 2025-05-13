@@ -640,7 +640,7 @@ function StartInterview() {
   const [timer, setTimer] = useState(0)
   const [timerActive, setTimerActive] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
-  const [conversation, setConversation] = useState([])
+  const [conversation, setConversation] = useState()
   const { interview_id } = useParams()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -697,14 +697,12 @@ function StartInterview() {
       toast('Interview Ended', { id: 'call-end', duration: 2000 })
       setIsCallActive(false)
       setTimerActive(false)
-      setTimeout(() => GenerateFeedback(), 1000) // Tunggu 1 detik
+      GenerateFeedback()
     }
 
     const handleMessage = (message) => {
-      console.log('Received message:', message)
-      if (message?.conversation) {
-        setConversation((prev) => [...prev, ...message.conversation])
-      }
+      console.log(message?.conversation)
+      setConversation(message?.conversation)
     }
 
     vapi.on('call-start', handleCallStart)
@@ -777,7 +775,7 @@ Contoh:
       vapi.stop()
       setIsCallActive(false)
       setTimerActive(false)
-      setTimeout(() => GenerateFeedback(), 1000) // Tunggu 1 detik
+      GenerateFeedback()
     }
   }
 
@@ -790,16 +788,9 @@ Contoh:
       .padStart(2, '0')}.${secs.toString().padStart(2, '0')}`
   }
 
-  const GenerateFeedback = async () => {
+   const GenerateFeedback = async () => {
     if (feedbackGeneratedRef.current) return
     feedbackGeneratedRef.current = true
-
-    console.log('Generating feedback with conversation:', conversation)
-
-    if (!conversation || conversation.length === 0) {
-      console.error('Conversation is empty. Cannot generate feedback.')
-      return
-    }
 
     try {
       const result = await axios.post('/api/ai-feedback', {
@@ -821,20 +812,19 @@ Contoh:
             recommended: false,
           },
         ])
-        .select()
+        .select( )
 
-      if (error) {
-        console.error('Error inserting data to Supabase:', error)
-      } else {
-        console.log('Data inserted successfully:', data)
-        router.replace('/interview/' + interview_id + '/completed')
-      }
+
+      console.log(data)
+      router.replace('/interview/' + interview_id + '/completed')
     } catch (err) {
       console.error('Feedback generation failed:', err)
     } finally {
       setLoading(false)
     }
   }
+  
+
 
   return (
     <div className="p-20 lg:px-48 xl:px-56">
