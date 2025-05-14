@@ -287,7 +287,7 @@ Ingat untuk:
   }
 
   const stopInterview = () => {
-    vapi.current.stop()
+    vapi.stop()
   }
 
   
@@ -311,9 +311,29 @@ Ingat untuk:
     toast('Interview Ended')
   });
 
-  vapi.on("message",(message)=>{
+ /* vapi.on("message",(message)=>{
     console.log(message);
   });
+  */
+
+  useEffect(()=>{
+    const handleMessage = (message) => {
+      console.log('Message: ',message);
+      if(message?.conversation){
+        const convoString = JSON.stringify(message.conversation);
+        console.log('Conversation string: ',convoString);
+        setConversation(convoString);
+        
+      }
+    };
+
+    vapi.on('message',handleMessage);
+
+    return ()=>{
+      vapi.off('message',handleMessage);
+    }
+    
+  },[]);
 
  
 
