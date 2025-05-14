@@ -221,7 +221,8 @@ function StartInterview() {
   const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY);
   const [activeUser, setActiveUser]=useState(false);
   const [loading, setLoading] = useState(false);
-  const [isCallActive, setIsCallActive] = useState(false);
+  const [conversation, setConversation] = useState();
+  
 
 
   useEffect(()=>{
@@ -309,6 +310,7 @@ Ingat untuk:
   vapi.on("call-end",()=>{
     console.log("Call has ended.");
     toast('Interview Ended')
+    GenerateFeedback();
   });
 
  /* vapi.on("message",(message)=>{
@@ -334,6 +336,10 @@ Ingat untuk:
     }
     
   },[]);
+
+  const GenerateFeedback = () => {
+    
+  }
 
  
 
