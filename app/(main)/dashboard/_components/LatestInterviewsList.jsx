@@ -43,7 +43,9 @@ function LatestInterviewsList() {
                 <h2>
                     You dont't have any interview created!
                 </h2>
+            < Link href={'/dashboard/create-interview'} className='bg-gray-200 border border-gray-200 rounded-lg p-5 cursor-pointer '>
                 <Button>+ Created New Interview</Button>
+                
         </div>}
 
         {interviewList&&
