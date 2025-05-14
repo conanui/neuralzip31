@@ -199,7 +199,7 @@ Ingat untuk:
 export default StartInterview  */
 
 
-/*
+
 "use client"
 import React, { useEffect } from 'react'
 import { useContext } from 'react'
@@ -365,7 +365,7 @@ Ingat untuk:
   )
 }
 
-export default StartInterview     */
+export default StartInterview     
 
 
 
@@ -1012,6 +1012,9 @@ export default StartInterview
 
 */
 
+
+/*
+
 'use client'
 import React, { useEffect, useState, useContext, useRef } from 'react'
 import { InterviewDataContext } from '@/context/InterviewDataContext'
@@ -1275,3 +1278,4 @@ Contoh:
 }
 
 export default StartInterview
+*/
