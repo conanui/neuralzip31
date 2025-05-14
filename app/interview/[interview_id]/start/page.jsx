@@ -287,11 +287,7 @@ Ingat untuk:
   }
 
   const stopInterview = () => {
-    if (isCallActive) {
-      vapi.stop()
-      setIsCallActive(false)
-     
-    }
+    vapi.current.stop()
   }
 
   
