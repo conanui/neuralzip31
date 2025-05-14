@@ -102,7 +102,7 @@ format: interviewQuestions=[
 Tujuan akhir Anda adalah menciptakan rencana wawancara yang efektif, terstruktur, dan sesuai waktu untuk posisi {{jobTitle}}.
 `.trim();
 
-
+/*
 export const FEEDBACK_PROMPT=`
 {{conversation}}
 
@@ -142,9 +142,9 @@ Berikan jawaban dalam format JSON seperti berikut:
         pesanRekomendasi: ''
     }
 }`
+*/
 
 
-/*
 export const FEEDBACK_PROMPT = `
 Analisis Wawancara:
 
@@ -189,7 +189,7 @@ Berikan jawaban dalam format JSON berikut:
     }
 }
 `
-*/
+
 
       
 
