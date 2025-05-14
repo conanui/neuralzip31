@@ -221,7 +221,7 @@ function StartInterview() {
   const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY);
   const [activeUser, setActiveUser]=useState(false);
   const [loading, setLoading] = useState(false);
-  
+  const [isCallActive, setIsCallActive] = useState(false);
 
 
   useEffect(()=>{
