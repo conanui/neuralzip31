@@ -199,7 +199,7 @@ Ingat untuk:
 export default StartInterview  */
 
 
-
+/*
 "use client"
 import React, { useEffect } from 'react'
 import { useContext } from 'react'
@@ -318,7 +318,7 @@ Ingat untuk:
     console.log(message);
   });
   
-/*
+
   useEffect(()=>{
     const handleMessage = (message) => {
       console.log('Message: ',message);
@@ -337,7 +337,7 @@ Ingat untuk:
     }
     
   },[]);
-  */
+  
 
   const GenerateFeedback = async() => {
        const result=await axios.post('/api/ai-feedback',{
@@ -399,7 +399,7 @@ Ingat untuk:
 }
 
 export default StartInterview     
-
+  */
 
 
 
@@ -1046,7 +1046,6 @@ export default StartInterview
 */
 
 
-/*
 
 'use client'
 import React, { useEffect, useState, useContext, useRef } from 'react'
@@ -1311,4 +1310,4 @@ Contoh:
 }
 
 export default StartInterview
-*/
+
