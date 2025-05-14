@@ -132,10 +132,10 @@ Berikan jawaban dalam format JSON seperti berikut:
 {
     umpanBalik: {
         penilaian: {
-            kemampuanTeknis:7 ,
-            komunikasi:7 ,
-            pemecahanMasalah:6 ,
-            pengalaman: 8
+            kemampuanTeknis: 0-10 ,
+            komunikasi:0-10 ,
+            pemecahanMasalah:0-10 ,
+            pengalaman: 0-10
         },
         ringkasan: <dalam 3 kalimat>,
         rekomendasi:'',
