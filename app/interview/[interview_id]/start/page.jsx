@@ -211,6 +211,7 @@ import Vapi from '@vapi-ai/web'
 import AlertConfirmation from './_components/AlertConfirmation'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import axios from 'axios'
 
 
 
@@ -313,11 +314,11 @@ Ingat untuk:
     GenerateFeedback();
   });
 
- /* vapi.on("message",(message)=>{
+ vapi.on("message",(message)=>{
     console.log(message);
   });
-  */
-
+  
+/*
   useEffect(()=>{
     const handleMessage = (message) => {
       console.log('Message: ',message);
@@ -336,9 +337,16 @@ Ingat untuk:
     }
     
   },[]);
+  */
 
-  const GenerateFeedback = () => {
-    
+  const GenerateFeedback = async() => {
+       const result=await axios.post('/api/ai-feedback',{
+         conversation:conversation
+       });
+    console.log(result?.data);
+    const Content = result.data.content;
+    const FINAL_CONTENT = Content.replace('```json','').replace('```','')
+    console.log(FINAL_CONTENT);
   }
 
  
