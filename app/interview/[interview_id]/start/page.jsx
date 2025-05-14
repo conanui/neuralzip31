@@ -352,7 +352,7 @@ Ingat untuk:
          </div>
          <div className='flex items-center gap-5 justify-center mt-7'>
             <Mic className='h-12 w-12 p-3 bg-gray-400 rounded-full cursor-pointer'/>
-            <AlertConfirmation stopInterview={()=>stopInterview()} >
+            <AlertConfirmation stopInterview={stopInterview} >
                 <Phone className='h-12 w-12 p-3 bg-red-400 rounded-full cursor-pointer'
             
                 />
