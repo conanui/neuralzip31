@@ -6,6 +6,7 @@ import { supabase } from '@/services/supabaseClient';
 import { useUser } from '@/app/provider';
 import InterviewCard from './InterviewCard';
 import { toast } from 'sonner';
+import Link from 'next/link'
 
 function LatestInterviewsList() {
     const [interviewList,setInterviewList]=useState([]);
@@ -45,6 +46,7 @@ function LatestInterviewsList() {
                 </h2>
             < Link href={'/dashboard/create-interview'} className='bg-gray-200 border border-gray-200 rounded-lg p-5 cursor-pointer '>
                 <Button>+ Created New Interview</Button>
+                </Link>
                 
         </div>}
 
