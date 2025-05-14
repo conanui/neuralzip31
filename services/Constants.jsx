@@ -130,8 +130,8 @@ Berikan jawaban dalam format JSON seperti berikut:
             pengalaman: 8
         },
         ringkasan: <dalam 3 kalimat>,
-        rekomendasi: '',
-        pesanRekomendasi: ''
+        rekomendasi: ",
+        pesanRekomendasi: "
     }
 }`
 
