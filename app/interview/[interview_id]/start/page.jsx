@@ -220,6 +220,7 @@ function StartInterview() {
   const {interviewInfo, setInterviewInfo}= useContext(InterviewDataContext);
   const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY);
   const [activeUser, setActiveUser]=useState(false);
+  const [loading, setLoading] = useState(false);
   
 
 
@@ -352,7 +353,7 @@ Ingat untuk:
          </div>
          <div className='flex items-center gap-5 justify-center mt-7'>
             <Mic className='h-12 w-12 p-3 bg-gray-400 rounded-full cursor-pointer'/>
-            <AlertConfirmation stopInterview={stopInterview} >
+            <AlertConfirmation stopInterview={stopInterview} setLoading={setLoading}>
                 <Phone className='h-12 w-12 p-3 bg-red-400 rounded-full cursor-pointer'
             
                 />
