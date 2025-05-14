@@ -82,12 +82,12 @@ function Interview() {
             <h2 className='flex gap-2 items-center text-gray-500 mt-3'><Clock className='h-4 w-4'/>{interviewData?.duration}</h2>
             <div className='w-full'>
               <h2>Enter Your Full Name</h2>
-              <Input placeholder='e.g. Donald Trump' onChange={(event)=>setUserName(event.target.value)}/>
+              <Input placeholder='e.g. Donald Trump 🥷' onChange={(event)=>setUserName(event.target.value)}/>
             </div>
 
             <div className='w-full'>
               <h2>Enter Your Email</h2>
-              <Input placeholder='e.g. pepek@gmail.com' onChange={(event)=>setUserEmail(event.target.value)}/>
+              <Input placeholder='e.g. 🐒🐒🐒🐒🐵@gmail.com' onChange={(event)=>setUserEmail(event.target.value)}/>
             </div>
 
 
